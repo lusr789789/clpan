@@ -41,24 +41,7 @@ jobs:
           fi
           echo "✅ 官方源码下载成功"
 
-      - name: 应用KV支持功能
-        run: |
-          # 应用KV支持到官方代码
-          node update_kv_worker.js _worker_official.js _worker.js
-          echo "✅ KV支持功能已应用"
-          
-          # 修复Unicode转义序列（如果fix_unicode.js存在）
-          if [ -f "fix_unicode.js" ]; then
-            node fix_unicode.js _worker.js
-            echo "✅ Unicode转义序列已修复"
-          else
-            echo "⚠️  fix_unicode.js 不存在，跳过Unicode修复"
-          fi
-          
-          # 清理临时文件
-          rm -f _worker_official.js
-
-      - name: 注入自定义 proxy 初始化到 _worker (1).js
+      - name: 注入自定义 proxy 初始化到 _worker_official.js
         run: |
           if [ -f "scripts/injectProxyInit.js" ]; then
             node scripts/injectProxyInit.js
