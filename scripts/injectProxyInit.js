@@ -43,10 +43,27 @@ async function initProxyFromEnvAndKV(env) {
     if (Array.isArray(proxyIPs) && proxyIPs.length > 0) {
         proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
     }
+    // DNS64Server 保持由外部 env 控制，不在此覆盖其他逻辑
+    DNS64Server = env.DNS64 || env.NAT64 || DNS64Server;
     return proxyIP;
 }
 // CUSTOM_END_PROXY_INIT
 `;
+
+function backupFile(filePath) {
+    try {
+        const stat = fs.statSync(filePath);
+        if (stat && stat.isFile()) {
+            const bak = `${filePath}.bak.${Date.now()}`;
+            fs.copyFileSync(filePath, bak);
+            console.log('Backup created:', bak);
+            return bak;
+        }
+    } catch (e) {
+        // ignore
+    }
+    return null;
+}
 
 function inject() {
     if (!fs.existsSync(WORKER_PATH)) {
@@ -56,29 +73,43 @@ function inject() {
 
     let content = fs.readFileSync(WORKER_PATH, 'utf8');
 
+    // If already has tagged block, replace it
     if (content.includes(START_TAG) && content.includes(END_TAG)) {
-        // replace existing block
         const regex = new RegExp(`${START_TAG}[\s\S]*?${END_TAG}`);
+        const bak = backupFile(WORKER_PATH);
         content = content.replace(regex, initSnippet);
         fs.writeFileSync(WORKER_PATH, content, 'utf8');
-        console.log('Replaced existing proxy init block.');
+        console.log('Replaced existing proxy init block. Backup:', bak || 'none');
         return;
     }
 
-    // Try to locate a reasonable insertion point: after the initial variable declarations
+    // Try to precisely replace existing init block between proxyIP assignment and DNS64Server assignment
+    // This keeps changes minimal and avoids touching unrelated code
+    const proxyBlockRegex = /\n\s*proxyIP\s*=.*\n[\s\S]*?\n\s*DNS64Server\s*=.*\n/m;
+    if (proxyBlockRegex.test(content)) {
+        const bak = backupFile(WORKER_PATH);
+        content = content.replace(proxyBlockRegex, '\n' + initSnippet + '\n');
+        fs.writeFileSync(WORKER_PATH, content, 'utf8');
+        console.log('Replaced proxyIP..DNS64Server init block. Backup:', bak || 'none');
+        return;
+    }
+
+    // Fallback: insert after `let proxyIP = '';` declaration
     const anchor = "let proxyIP = '';";
     const idx = content.indexOf(anchor);
     if (idx !== -1) {
+        const bak = backupFile(WORKER_PATH);
         const insertAt = content.indexOf('\n', idx) + 1;
         const newContent = content.slice(0, insertAt) + '\n' + initSnippet + content.slice(insertAt);
         fs.writeFileSync(WORKER_PATH, newContent, 'utf8');
-        console.log('Inserted proxy init block after proxyIP declaration.');
+        console.log('Inserted proxy init block after proxyIP declaration. Backup:', bak || 'none');
         return;
     }
 
-    // Fallback: append at end
+    // Last resort: append
+    const bak = backupFile(WORKER_PATH);
     fs.appendFileSync(WORKER_PATH, '\n' + initSnippet, 'utf8');
-    console.log('Appended proxy init block at end of file.');
+    console.log('Appended proxy init block at end of file. Backup:', bak || 'none');
 }
 
 inject();
