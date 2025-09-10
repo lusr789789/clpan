@@ -1,11 +1,10 @@
-name = "sdfff-20250910-1253-20250910-1306-20250910-1345"
-compatibility_date = "2025-09-10"
+name = "v20250907"
 main = "_worker.js"
-
+compatibility_date = "2025-09-11"
+keep_vars = true
 kv_namespaces = [
   { binding = "KV", id = "8a2d5758957149d0b21252ee7571d3c7" }
 ]
-
 [vars]
 UUID = "5c240cb3-0c29-491a-ad03-32a30aafe25d"
 
