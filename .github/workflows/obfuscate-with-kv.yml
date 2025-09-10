@@ -46,9 +46,15 @@ jobs:
           fi
           echo "✅ 官方源码下载成功"
 
+      - name: 应用KV支持功能
+        run: |
+          # 先应用KV支持到明文代码
+          node update_kv_worker.js 明文源码.js _worker_with_kv.js
+          echo "✅ KV支持功能已应用到明文代码"
+
       - name: 混淆代码
         run: |
-          javascript-obfuscator 明文源码.js --output _worker_temp.js \
+          javascript-obfuscator _worker_with_kv.js --output _worker.js \
           --compact true \
           --control-flow-flattening true \
           --control-flow-flattening-threshold 1 \
@@ -62,16 +68,9 @@ jobs:
           --transform-object-keys true \
           --unicode-escape-sequence true
           
-          echo "✅ 代码混淆完成"
-
-      - name: 应用KV支持功能
-        run: |
-          # 使用Node.js脚本应用KV支持
-          node update_kv_worker.js _worker_temp.js _worker.js
-          
           # 清理临时文件
-          rm -f _worker_temp.js 明文源码.js
-          echo "✅ KV支持功能已应用"
+          rm -f _worker_with_kv.js 明文源码.js
+          echo "✅ 代码混淆完成"
 
       - name: 验证语法
         run: node -c _worker.js
