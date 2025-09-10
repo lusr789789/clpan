@@ -2,9 +2,8 @@ name: Deploy Worker with KV ProxyIP Feature
 
 on:
   push:
-    branches: [ main ]
+
   pull_request:
-    branches: [ main ]
 
 jobs:
   deploy:
