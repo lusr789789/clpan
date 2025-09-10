@@ -1,53 +1,67 @@
-name: 部署 EdgeTunnel Worker
+name: Deploy EdgeTunnel Worker
 
+# 触发条件
 on:
   push:
 分支:
-      - main
+      - main       # 修正为英文 branches，确保 push 到 main 分支时触发
+  workflow_dispatch: {} # 手动触发
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout 仓库
+      # 1. 拉取仓库代码
+      - name: Checkout repository
         uses: actions/checkout@v3
+
       # 2. 下载原始 worker.js
-      - name: 获取原始 _worker.js
+      - name: Fetch original _worker.js
         run: |
           curl -L https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js -o _worker.js
 
-      # 3. 用新逻辑覆盖 proxyIP 部分
-      - name: 覆盖 proxyIP 逻辑
+      # 3. 覆盖 proxyIP 逻辑
+      - name: Patch proxyIP logic
         run: |
           cat > _worker.js << 'EOF'
-// ===================== Patch Start =====================
-try {
-    const envProxy = env.PROXYIP || env.proxyip || proxyIP;
-    if (envProxy && envProxy.trim()) {
-        proxyIP = envProxy;
-        try {
-            proxyIPPool = (await 整理(proxyIP)).filter(Boolean);
-        } catch (err) {
-            console.error("解析 env PROXYIP 失败:", err);
-            proxyIPPool = proxyIP.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        }
-    } else if (env.KV) {
-        const kvProxy = await env.KV.get("PROXYIP");
-        if (kvProxy) {
-            const lines = kvProxy.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-            proxyIP = lines.length > 0 ? lines[0] : "";
-            try {
-                proxyIPPool = (await 整理(kvProxy)).filter(Boolean);
-            } catch (err) {
-                console.error("解析 KV PROXYIP 失败:", err);
-                proxyIPPool = lines.slice();
-            }
-        }
-    }
-} catch (e) {
-    console.error("读取 PROXYIP 配置失败:", e);
-}
+          // ===================== Patch Start =====================
+          try {
+              const envProxy = env.PROXYIP || env.proxyip || proxyIP;
+              if (envProxy && envProxy.trim()) {
+                  proxyIP = envProxy;
+                  try {
+                      proxyIPPool = (await 整理(proxyIP)).filter(Boolean);
+                  } catch (err) {
+                      console.error("解析 env PROXYIP 失败:", err);
+                      proxyIPPool = proxyIP.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                  }
+              } else if (env.KV) {
+                  const kvProxy = await env.KV.get("PROXYIP");
+                  if (kvProxy) {
+                      const lines = kvProxy.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                      proxyIP = lines.length > 0 ? lines[0] : "";
+                      try {
+                          proxyIPPool = (await 整理(kvProxy)).filter(Boolean);
+                      } catch (err) {
+                          console.error("解析 KV PROXYIP 失败:", err);
+                          proxyIPPool = lines.slice();
+                      }
+                  }
+              }
+          } catch (e) {
+              console.error("读取 PROXYIP 配置失败:", e);
+          }
 
-proxyIPs = await 整理(proxyIP);
-proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
-// ===================== Patch End =====================
-EOF
+          proxyIPs = await 整理(proxyIP);
+          proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
+          // ===================== Patch End =====================
+          EOF
+
+      # 4. 安装 Wrangler
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      # 5. 部署到 Cloudflare Workers
+      - name: Deploy to Cloudflare Workers
+        run: wrangler deploy
