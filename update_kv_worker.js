@@ -26,9 +26,17 @@ const KV_PATCHES = {
                             proxyIP = lines[0];
                             try {
                                 proxyIPPool = (await 整理(kvProxy)).filter(Boolean);
+                                // 直接使用KV中的IP池，避免被后续逻辑覆盖
+                                proxyIPs = proxyIPPool;
+                                proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
+                                return; // 提前返回，避免执行后续的随机选择逻辑
                             } catch (err) {
                                 console.error('解析 KV PROXYIP 生成 proxyIPPool 失败:', err);
                                 proxyIPPool = lines.filter(Boolean);
+                                // 同样处理错误情况
+                                proxyIPs = proxyIPPool;
+                                proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
+                                return;
                             }
                         }
                     }
