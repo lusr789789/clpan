@@ -1,8 +1,6 @@
-name: Update EdgeTunnel Worker Script
-
+name: 混淆当前版本源码
 on:
-
-  workflow_dispatch: {}
+    workflow_dispatch:
 
 jobs:
   update-worker:
