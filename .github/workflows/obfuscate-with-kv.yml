@@ -60,7 +60,7 @@ jobs:
         push:
 分支:
             - main
-        workflow_dispatch: {}
+        workflow_dispatch:
 
       jobs:
         deploy:
