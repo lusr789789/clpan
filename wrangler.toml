@@ -2,9 +2,9 @@ name = "edge-tunnel-worker"
 compatibility_date = "2025-09-10"
 main = "_worker.js"
 
-[kv_namespaces]
-binding = "KV"
-id = "8a2d5758957149d0b21252ee7571d3c7"
+kv_namespaces = [
+  { binding = "KV", id = "8a2d5758957149d0b21252ee7571d3c7" }
+]
 
 [vars]
 UUID = "5c240cb3-0c29-491a-ad03-32a30aafe25d"
