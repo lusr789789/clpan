@@ -47,6 +47,10 @@ jobs:
           node update_kv_worker.js _worker_official.js _worker.js
           echo "✅ KV支持功能已应用"
           
+          # 修复Unicode转义序列
+          node fix_unicode.js _worker.js
+          echo "✅ Unicode转义序列已修复"
+          
           # 清理临时文件
           rm -f _worker_official.js
 
