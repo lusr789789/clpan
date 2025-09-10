@@ -1,134 +1,61 @@
-name: 仅更新KV支持功能
+name: Deploy EdgeTunnel Worker
 
 on:
+  push:
+分支:
+      - main
   workflow_dispatch:
-  schedule:
-    - cron: '0 2 * * *'  # 每天UTC时间2点自动运行
 
 jobs:
-  update-kv-support:
+  deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: 检出代码
+      - name: Checkout repo
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      - name: 设置Node.js环境
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18"
-
-      - name: 备份原始文件
+      - name: Fetch original worker.js
         run: |
-          if [ -f "_worker.js" ]; then
-            cp _worker.js _worker.js.backup.$(date +%Y%m%d_%H%M%S)
-            echo "✅ 原始文件已备份"
-          fi
+          curl -L https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js -o _worker.js
 
-      - name: 下载最新官方源码
+      - name: Patch proxyIP logic
         run: |
-          # 替换为实际的官方源码URL
-          OFFICIAL_URL="https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js"
-          curl -s "$OFFICIAL_URL" -o _worker_official.js
-          
-          if [ ! -s "_worker_official.js" ]; then
-            echo "❌ 下载官方源码失败"
-            exit 1
-          fi
-          echo "✅ 官方源码下载成功"
+          sed -i '/proxyIP = env.PROXYIP || env.proxyip || proxyIP;/,/proxyIP = proxyIPs\[Math.floor.*proxyIPs.length\)\];/c\
+          // 优先使用 env.PROXYIP 或传入的 proxyIP，若无则从 KV 中读取 PROXYIP\n\
+          try {\n\
+              const envProxy = env.PROXYIP || env.proxyip || proxyIP;\n\
+              if (envProxy && envProxy.trim()) {\n\
+                  proxyIP = envProxy;\n\
+                  try {\n\
+                      proxyIPPool = (await 整理(proxyIP)).filter(Boolean);\n\
+                  } catch (err) {\n\
+                      console.error(\"解析 env PROXYIP 失败:\", err);\n\
+                      proxyIPPool = proxyIP.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\n\
+                  }\n\
+              } else if (env.KV) {\n\
+                  const kvProxy = await env.KV.get(\"PROXYIP\");\n\
+                  if (kvProxy) {\n\
+                      const lines = kvProxy.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\n\
+                      proxyIP = lines.length > 0 ? lines[0] : \"\";\n\
+                      try {\n\
+                          proxyIPPool = (await 整理(kvProxy)).filter(Boolean);\n\
+                      } catch (err) {\n\
+                          console.error(\"解析 KV PROXYIP 失败:\", err);\n\
+                          proxyIPPool = lines.slice();\n\
+                      }\n\
+                  }\n\
+              }\n\
+          } catch (e) {\n\
+              console.error(\"读取 PROXYIP 配置失败:\", e);\n\
+          }\n\
+          \n\
+          proxyIPs = await 整理(proxyIP);\n\
+          proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];' _worker.js
 
-      - name: 注入自定义 proxy 初始化到 _worker_official.js
-        run: |
-          if [ -f "scripts/injectProxyInit.js" ] && [ -f "_worker_official.js" ]; then
-            node scripts/injectProxyInit.js _worker_official.js
-            echo "✅ 已对 _worker_official.js 运行注入器脚本"
-          else
-            echo "⚠️ injectProxyInit.js 或 _worker_official.js 不存在，跳过注入"
-          fi
+      - name: Install Wrangler
+        run: npm install -g wrangler
 
-      - name: 修复Unicode转义序列（针对 _worker_official.js）
-        run: |
-          if [ -f "fix_unicode.js" ] && [ -f "_worker_official.js" ]; then
-            node fix_unicode.js _worker_official.js
-            echo "✅ Unicode转义序列已修复 (_worker_official.js)"
-          else
-            echo "⚠️ fix_unicode.js 或 _worker_official.js 不存在，跳过Unicode修复"
-          fi
-
-      - name: 将 _worker_official.js 重命名为 _worker.js
-        run: |
-          if [ -f "_worker_official.js" ]; then
-            mv -f _worker_official.js _worker.js
-            echo "✅ 已将 _worker_official.js 重命名为 _worker.js"
-          else
-            echo "⚠️ _worker_official.js 不存在，跳过重命名"
-          fi
-
-      - name: 验证文件
-        run: |
-          if [ -f "_worker.js" ] && [ -s "_worker.js" ]; then
-            echo "✅ 文件验证通过"
-            echo "文件大小: $(wc -c < _worker.js) 字节"
-          else
-            echo "❌ 文件生成失败"
-            exit 1
-          fi
-
-      - name: 更新wrangler.toml名称
-        run: |
-          # 在wrangler.toml的name中添加时间戳
-          if [ -f "wrangler.toml" ]; then
-            TIMESTAMP=$(date +%Y%m%d-%H%M)
-            # 简单直接的方法：读取第一行并修改
-            FIRST_LINE=$(head -1 wrangler.toml)
-            if echo "$FIRST_LINE" | grep -q '^name *= *"'; then
-              # 提取引号内的名称
-              CURRENT_NAME=$(echo "$FIRST_LINE" | sed 's/^name *= *"\([^"]*\)".*/\1/')
-              NEW_NAME="${CURRENT_NAME}-${TIMESTAMP}"
-              # 直接替换整行
-              sed -i "1s/.*/name = \"${NEW_NAME}\"/" wrangler.toml
-              echo "✅ 已更新wrangler.toml名称: ${NEW_NAME}"
-              
-              # 验证是否真的更改了
-              if grep -q "${NEW_NAME}" wrangler.toml; then
-                echo "✅ 名称更新验证成功"
-              else
-                echo "❌ 名称更新失败，当前内容:"
-                head -1 wrangler.toml
-              fi
-            else
-              echo "⚠️  第一行不是name定义，跳过名称更新"
-              echo "第一行内容: $FIRST_LINE"
-            fi
-          else
-            echo "⚠️  wrangler.toml不存在，跳过名称更新"
-          fi
-
-      - name: 提交更改
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          
-          git add _worker.js wrangler.toml
-          if git diff --cached --quiet; then
-            echo "🟡 无文件更改，跳过提交"
-          else
-            git commit -m "🔧 [自动化] 更新KV支持功能 - $(date +%Y-%m-%d)"
-            echo "✅ 更改已提交"
-          fi
-
-      - name: 推送更改
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
-
-      - name: 清理旧备份
-        run: |
-          # 保留最近5个备份文件
-          ls -t _worker.js.backup.* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
-          echo "✅ 清理完成"
+      - name: Deploy to Cloudflare Workers
+        run: wrangler deploy
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
