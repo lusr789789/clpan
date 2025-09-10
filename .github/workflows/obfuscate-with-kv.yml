@@ -47,9 +47,13 @@ jobs:
           node update_kv_worker.js _worker_official.js _worker.js
           echo "✅ KV支持功能已应用"
           
-          # 修复Unicode转义序列
-          node fix_unicode.js _worker.js
-          echo "✅ Unicode转义序列已修复"
+          # 修复Unicode转义序列（如果fix_unicode.js存在）
+          if [ -f "fix_unicode.js" ]; then
+            node fix_unicode.js _worker.js
+            echo "✅ Unicode转义序列已修复"
+          else
+            echo "⚠️  fix_unicode.js 不存在，跳过Unicode修复"
+          fi
           
           # 清理临时文件
           rm -f _worker_official.js
@@ -64,12 +68,23 @@ jobs:
             exit 1
           fi
 
+      - name: 更新wrangler.toml名称
+        run: |
+          # 在wrangler.toml的name中添加时间戳
+          if [ -f "wrangler.toml" ]; then
+            TIMESTAMP=$(date +%Y%m%d-%H%M)
+            sed -i "s/^name = \"edge-tunnel-worker\"/name = \"edge-tunnel-worker-${TIMESTAMP}\"/" wrangler.toml
+            echo "✅ 已更新wrangler.toml名称: edge-tunnel-worker-${TIMESTAMP}"
+          else
+            echo "⚠️  wrangler.toml不存在，跳过名称更新"
+          fi
+
       - name: 提交更改
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          git add _worker.js
+          git add _worker.js wrangler.toml
           if git diff --cached --quiet; then
             echo "🟡 无文件更改，跳过提交"
           else
