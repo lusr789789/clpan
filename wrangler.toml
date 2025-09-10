@@ -5,6 +5,10 @@ keep_vars = true
 kv_namespaces = [
   { binding = "KV", id = "8a2d5758957149d0b21252ee7571d3c7" }
 ]
+type = "modules"    # 保证使用原生 ES 模块
 [vars]
 UUID = "5c240cb3-0c29-491a-ad03-32a30aafe25d"
 
+
+[build]
+upload_format = "modules"
