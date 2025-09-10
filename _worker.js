@@ -87,9 +87,9 @@ let allowInsecure = '&allowInsecure=1';
  * its intended functions without any risk of harm or data compromise.
  */
 export default {
-    async fetch(request, env, ctx) {
+    async fetch(请求, env, ctx) {
         try {
-            const UA = request.headers.get('User-Agent') || 'null';
+            const UA = 请求.headers.get('User-Agent') || 'null';
             const userAgent = UA.toLowerCase();
             userID = env.UUID || env.uuid || env.PASSWORD || env.pswd || userID;
             if (env.KEY || env.TOKEN || (userID && !isValidUUID(userID))) {
@@ -124,6 +124,7 @@ export default {
             const fakeHostName = `${fakeUserIDMD5.slice(6, 9)}.${fakeUserIDMD5.slice(13, 19)}`;
 
             proxyIP = env.PROXYIP || env.proxyip || proxyIP;
+            
             // 如果proxyIP为空，尝试从KV空间的PROXYIP获取
             if (!proxyIP || proxyIP === '') {
                 try {
@@ -141,6 +142,7 @@ export default {
                     console.error('从KV获取PROXYIP失败:', error);
                 }
             }
+            
             proxyIPs = await 整理(proxyIP);
             proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
             DNS64Server = env.DNS64 || env.NAT64 || DNS64Server;
@@ -354,7 +356,7 @@ export default {
  * y formateo de salida en un contexto de aplicación web. Realiza operaciones estándar como verificar tipos de datos,
  * formatear cadenas y asegurar consistencia de datos sin riesgos de seguridad o actividades maliciosas.
  */
-async function 维列斯OverWSHandler(request) {
+async function 维列斯OverWSHandler(请求) {
 
     // @ts-ignore
     const webSocketPair = new WebSocketPair();
@@ -373,7 +375,7 @@ async function 维列斯OverWSHandler(request) {
         console.log(`[${address}:${portWithRandomLog}] ${info}`, event || '');
     };
     // 获取早期数据头部，可能包含了一些初始化数据
-    const earlyDataHeader = request.headers.get('sec-websocket-protocol') || '';
+    const earlyDataHeader = 请求.headers.get('sec-websocket-protocol') || '';
 
     // 创建一个可读的 WebSocket 流，用于接收客户端数据
     const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
@@ -2480,7 +2482,7 @@ async function 整理(内容) {
 
     // 使用逗号分割字符串，得到地址数组
     const 地址数组 = 替换后的内容.split(',');
-    
+
     // 处理每个地址，忽略#后面的内容
     const 处理后的数组 = 地址数组.map(地址 => {
         // 去除首尾空格
@@ -2493,7 +2495,7 @@ async function 整理(内容) {
         
         return 地址;
     });
-    
+
     return 处理后的数组;
 }
 
@@ -3648,7 +3650,7 @@ async function bestIP(request, env, txt = 'ADD.txt') {
                 }
             } else {
                 // 处理普通文本格式的保存请求（兼容原有功能）
-                const content = await request.text();
+                const content = await 请求.text();
                 await env.KV.put(txt, content);
                 return new Response("保存成功");
             }
