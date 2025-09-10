@@ -1,61 +1,53 @@
-name: Deploy EdgeTunnel Worker
+name: 部署 EdgeTunnel Worker
 
 on:
   push:
 分支:
       - main
-  workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout 仓库
         uses: actions/checkout@v3
-
-      - name: Fetch original worker.js
+      # 2. 下载原始 worker.js
+      - name: 获取原始 _worker.js
         run: |
           curl -L https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js -o _worker.js
 
-      - name: Patch proxyIP logic
+      # 3. 用新逻辑覆盖 proxyIP 部分
+      - name: 覆盖 proxyIP 逻辑
         run: |
-          sed -i '/proxyIP = env.PROXYIP || env.proxyip || proxyIP;/,/proxyIP = proxyIPs\[Math.floor.*proxyIPs.length\)\];/c\
-          // 优先使用 env.PROXYIP 或传入的 proxyIP，若无则从 KV 中读取 PROXYIP\n\
-          try {\n\
-              const envProxy = env.PROXYIP || env.proxyip || proxyIP;\n\
-              if (envProxy && envProxy.trim()) {\n\
-                  proxyIP = envProxy;\n\
-                  try {\n\
-                      proxyIPPool = (await 整理(proxyIP)).filter(Boolean);\n\
-                  } catch (err) {\n\
-                      console.error(\"解析 env PROXYIP 失败:\", err);\n\
-                      proxyIPPool = proxyIP.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\n\
-                  }\n\
-              } else if (env.KV) {\n\
-                  const kvProxy = await env.KV.get(\"PROXYIP\");\n\
-                  if (kvProxy) {\n\
-                      const lines = kvProxy.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\n\
-                      proxyIP = lines.length > 0 ? lines[0] : \"\";\n\
-                      try {\n\
-                          proxyIPPool = (await 整理(kvProxy)).filter(Boolean);\n\
-                      } catch (err) {\n\
-                          console.error(\"解析 KV PROXYIP 失败:\", err);\n\
-                          proxyIPPool = lines.slice();\n\
-                      }\n\
-                  }\n\
-              }\n\
-          } catch (e) {\n\
-              console.error(\"读取 PROXYIP 配置失败:\", e);\n\
-          }\n\
-          \n\
-          proxyIPs = await 整理(proxyIP);\n\
-          proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];' _worker.js
+          cat > _worker.js << 'EOF'
+// ===================== Patch Start =====================
+try {
+    const envProxy = env.PROXYIP || env.proxyip || proxyIP;
+    if (envProxy && envProxy.trim()) {
+        proxyIP = envProxy;
+        try {
+            proxyIPPool = (await 整理(proxyIP)).filter(Boolean);
+        } catch (err) {
+            console.error("解析 env PROXYIP 失败:", err);
+            proxyIPPool = proxyIP.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        }
+    } else if (env.KV) {
+        const kvProxy = await env.KV.get("PROXYIP");
+        if (kvProxy) {
+            const lines = kvProxy.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            proxyIP = lines.length > 0 ? lines[0] : "";
+            try {
+                proxyIPPool = (await 整理(kvProxy)).filter(Boolean);
+            } catch (err) {
+                console.error("解析 KV PROXYIP 失败:", err);
+                proxyIPPool = lines.slice();
+            }
+        }
+    }
+} catch (e) {
+    console.error("读取 PROXYIP 配置失败:", e);
+}
 
-      - name: Install Wrangler
-        run: npm install -g wrangler
-
-      - name: Deploy to Cloudflare Workers
-        run: wrangler deploy
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+proxyIPs = await 整理(proxyIP);
+proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
+// ===================== Patch End =====================
+EOF
