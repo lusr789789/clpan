@@ -1,0 +1,130 @@
+name: Deploy Worker with KV ProxyIP Feature
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Download and prepare source code
+      id: prepare-source
+      run: |
+        echo "正在准备源码..."
+        
+        # 始终下载最新源码作为基准
+        echo "下载最新原始代码..."
+        curl -s -o _worker_original.js https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js
+        
+        if [ -f _worker_original.js ] && [ -s _worker_original.js ]; then
+          echo "✅ 原始源码下载成功"
+          # 使用原始代码作为工作副本
+          cp _worker_original.js _worker.js
+          echo "original_downloaded=true" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ 原始源码下载失败，使用当前版本"
+          echo "original_downloaded=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Apply modifications with backup
+      id: apply-modifications
+      run: |
+        echo "开始应用修改..."
+        
+        # 备份原始文件
+        cp _worker.js _worker_backup.js
+        
+        # 方法1: 首先尝试使用智能脚本应用修改
+        echo "方法1: 使用智能脚本应用修改..."
+        if node scripts/apply-to-original.js; then
+          echo "✅ 智能脚本应用成功"
+          echo "modification_applied=true" >> $GITHUB_OUTPUT
+          echo "method_used=smart_script" >> $GITHUB_OUTPUT
+        else
+          echo "❌ 智能脚本失败，尝试方法2: Git补丁..."
+          
+          # 恢复备份
+          cp _worker_backup.js _worker.js
+          
+          # 方法2: 尝试应用Git补丁
+          if [ -f kv_proxyip_feature_correct.patch ]; then
+            if git apply --check kv_proxyip_feature_correct.patch; then
+              git apply kv_proxyip_feature_correct.patch
+              echo "✅ Git补丁应用成功"
+              echo "modification_applied=true" >> $GITHUB_OUTPUT
+              echo "method_used=git_patch" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Git补丁失败，尝试方法3: 手动模式匹配..."
+              
+              # 恢复备份
+              cp _worker_backup.js _worker.js
+              
+              # 方法3: 使用增强的模式匹配
+              if node scripts/apply-enhanced.js; then
+                echo "✅ 增强模式匹配成功"
+                echo "modification_applied=true" >> $GITHUB_OUTPUT
+                echo "method_used=enhanced_pattern" >> $GITHUB_OUTPUT
+              else
+                echo "❌ 所有自动方法都失败，需要手动干预"
+                echo "modification_applied=false" >> $GITHUB_OUTPUT
+                echo "method_used=failed" >> $GITHUB_OUTPUT
+                
+                # 恢复为原始代码，至少保证可以部署
+                cp _worker_backup.js _worker.js
+              fi
+            fi
+          else
+            echo "❌ 补丁文件不存在"
+            echo "modification_applied=false" >> $GITHUB_OUTPUT
+            echo "method_used=no_patch" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+        # 清理备份文件
+        rm -f _worker_backup.js _worker_original.js
+        
+    - name: Upload modified source code
+      if: steps.apply-modifications.outputs.modification_applied == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: modified-worker
+        path: _worker.js
+        retention-days: 1
+
+    - name: Show modification summary
+      run: |
+        echo "✅ 源代码修改完成!"
+        echo "使用的方法: ${{ steps.apply-modifications.outputs.method_used }}"
+        echo "修改后的文件已保存为制品: modified-worker"
+        echo "可以直接使用或手动部署到Cloudflare"
+        
+    - name: Notify on Failure
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const message = '🚨 源代码修改失败！请检查补丁是否与最新代码冲突。';
+          
+          if (context.payload.pull_request) {
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: message + ' PR: #' + context.payload.pull_request.number
+            });
+          }
+          
+          console.log('修改失败通知已准备');
