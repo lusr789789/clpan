@@ -73,8 +73,17 @@ jobs:
           # 在wrangler.toml的name中添加时间戳
           if [ -f "wrangler.toml" ]; then
             TIMESTAMP=$(date +%Y%m%d-%H%M)
-            sed -i "s/^name = \"edge-tunnel-worker\"/name = \"edge-tunnel-worker-${TIMESTAMP}\"/" wrangler.toml
+            # 使用更灵活的匹配，处理可能的空格差异
+            sed -i "s/^name *= *\"edge-tunnel-worker\"/name = \"edge-tunnel-worker-${TIMESTAMP}\"/" wrangler.toml
             echo "✅ 已更新wrangler.toml名称: edge-tunnel-worker-${TIMESTAMP}"
+            
+            # 验证是否真的更改了
+            if grep -q "edge-tunnel-worker-${TIMESTAMP}" wrangler.toml; then
+              echo "✅ 名称更新验证成功"
+            else
+              echo "❌ 名称更新失败，当前内容:"
+              head -1 wrangler.toml
+            fi
           else
             echo "⚠️  wrangler.toml不存在，跳过名称更新"
           fi
