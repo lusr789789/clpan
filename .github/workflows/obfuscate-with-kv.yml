@@ -1,4 +1,4 @@
-name: 混淆最新版本源码并集成KV支持
+name: 仅更新KV支持功能
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     - cron: '0 2 * * *'  # 每天UTC时间2点自动运行
 
 jobs:
-  obfuscate-and-update:
+  update-kv-support:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,11 +22,6 @@ jobs:
         with:
           node-version: "18"
 
-      - name: 安装依赖
-        run: |
-          npm install -g javascript-obfuscator
-          npm install axios
-
       - name: 备份原始文件
         run: |
           if [ -f "_worker.js" ]; then
@@ -38,9 +33,9 @@ jobs:
         run: |
           # 替换为实际的官方源码URL
           OFFICIAL_URL="https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js"
-          curl -s "$OFFICIAL_URL" -o 明文源码.js
+          curl -s "$OFFICIAL_URL" -o _worker_official.js
           
-          if [ ! -s "明文源码.js" ]; then
+          if [ ! -s "_worker_official.js" ]; then
             echo "❌ 下载官方源码失败"
             exit 1
           fi
@@ -48,41 +43,20 @@ jobs:
 
       - name: 应用KV支持功能
         run: |
-          # 先应用KV支持到明文代码
-          node update_kv_worker.js 明文源码.js _worker_with_kv.js
-          echo "✅ KV支持功能已应用到明文代码"
-
-      - name: 混淆代码
-        run: |
-          javascript-obfuscator _worker_with_kv.js --output _worker.js \
-          --compact true \
-          --control-flow-flattening true \
-          --control-flow-flattening-threshold 1 \
-          --dead-code-injection true \
-          --dead-code-injection-threshold 1 \
-          --identifier-names-generator hexadecimal \
-          --rename-globals true \
-          --string-array true \
-          --string-array-encoding 'rc4' \
-          --string-array-threshold 1 \
-          --transform-object-keys true \
-          --unicode-escape-sequence true
+          # 应用KV支持到官方代码
+          node update_kv_worker.js _worker_official.js _worker.js
+          echo "✅ KV支持功能已应用"
           
           # 清理临时文件
-          rm -f _worker_with_kv.js 明文源码.js
-          echo "✅ 代码混淆完成"
+          rm -f _worker_official.js
 
-      - name: 跳过语法验证（ES模块）
-        run: echo "⚠️  跳过语法验证 - Cloudflare Workers使用ES模块语法"
-
-      - name: 验证混淆文件存在
+      - name: 验证文件
         run: |
-          # 只验证文件是否成功生成，不检查具体内容（因为已被混淆）
           if [ -f "_worker.js" ] && [ -s "_worker.js" ]; then
-            echo "✅ 混淆文件已成功生成"
+            echo "✅ 文件验证通过"
             echo "文件大小: $(wc -c < _worker.js) 字节"
           else
-            echo "❌ 混淆文件生成失败"
+            echo "❌ 文件生成失败"
             exit 1
           fi
 
@@ -95,7 +69,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "🟡 无文件更改，跳过提交"
           else
-            git commit -m "🔧 [自动化] 混淆代码并集成KV支持功能 - $(date +%Y-%m-%d)"
+            git commit -m "🔧 [自动化] 更新KV支持功能 - $(date +%Y-%m-%d)"
             echo "✅ 更改已提交"
           fi
 
@@ -105,8 +79,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.ref }}
 
-      - name: 清理工作区
+      - name: 清理旧备份
         run: |
           # 保留最近5个备份文件
-          ls -t _worker.js.backup.* | tail -n +6 | xargs rm -f 2>/dev/null || true
-          echo "✅ 工作区清理完成"
+          ls -t _worker.js.backup.* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+          echo "✅ 清理完成"
