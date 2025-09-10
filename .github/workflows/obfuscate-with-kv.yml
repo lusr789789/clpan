@@ -1,4 +1,5 @@
 name: Update EdgeTunnel Worker Script
+
 on:
   workflow_dispatch: {}
 
@@ -32,3 +33,12 @@ jobs:
         run: |
           echo "_worker.js 已更新，文件大小："
           ls -lh _worker.js
+
+      # 6. 提交修改回仓库
+      - name: Commit updated _worker.js
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add _worker.js
+          git commit -m "Update _worker.js via GitHub Actions" || echo "No changes to commit"
+          git push
