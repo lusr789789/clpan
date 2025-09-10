@@ -9,10 +9,3 @@ kv_namespaces = [
 [vars]
 UUID = "5c240cb3-0c29-491a-ad03-32a30aafe25d"
 
-
-# 可选：环境配置
-[env.production]
-compatibility_date = "2025-09-10"
-
-[env.staging]
-compatibility_date = "2025-09-10"
