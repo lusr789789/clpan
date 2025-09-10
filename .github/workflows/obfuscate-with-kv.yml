@@ -55,18 +55,3 @@ jobs:
           proxyIP = (proxyIPPool && proxyIPPool.length > 0) ? proxyIPPool[Math.floor(Math.random() * proxyIPPool.length)] : "";
           // ===================== Patch End =====================
           EOF
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-      # 使用 wrangler 部署到 Cloudflare Workers，目标为 EdgeTunnel Worker
-      # Deploy to Cloudflare Workers using wrangler, targeting the EdgeTunnel Worker
-      # 请确保 CF_API_TOKEN 拥有对应账户的 Workers 写入权限
-      # Make sure CF_API_TOKEN has Workers write permission for the corresponding account
-      - name: Deploy to Cloudflare Workers
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        run: |
-          npm install -g wrangler@latest
-          wrangler deploy --api-token "$CF_API_TOKEN"
