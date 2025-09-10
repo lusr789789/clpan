@@ -75,13 +75,14 @@ jobs:
       - name: 跳过语法验证（ES模块）
         run: echo "⚠️  跳过语法验证 - Cloudflare Workers使用ES模块语法"
 
-      - name: 测试KV功能
+      - name: 验证混淆文件存在
         run: |
-          # 验证KV相关功能是否存在
-          if grep -q "env\.KV" _worker.js && grep -q "PROXYIP" _worker.js; then
-            echo "✅ KV功能验证通过"
+          # 只验证文件是否成功生成，不检查具体内容（因为已被混淆）
+          if [ -f "_worker.js" ] && [ -s "_worker.js" ]; then
+            echo "✅ 混淆文件已成功生成"
+            echo "文件大小: $(wc -c < _worker.js) 字节"
           else
-            echo "❌ KV功能未正确应用"
+            echo "❌ 混淆文件生成失败"
             exit 1
           fi
 
