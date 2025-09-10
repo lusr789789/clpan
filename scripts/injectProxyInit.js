@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const WORKER_PATH = path.join(process.cwd(), '_worker (1).js');
+const targetArg = process.argv[2];
+// 默认目标改为 _worker_official.js，以匹配 workflow 下载的官方源码文件名
+const targetFile = targetArg && targetArg.trim() ? targetArg.trim() : '_worker_official.js';
+const WORKER_PATH = path.join(process.cwd(), targetFile);
 
 const START_TAG = '// CUSTOM_START_PROXY_INIT';
 const END_TAG = '// CUSTOM_END_PROXY_INIT';
