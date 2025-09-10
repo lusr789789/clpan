@@ -5,6 +5,7 @@ on:
 
   pull_request:
 
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,12 +26,12 @@ jobs:
         
         # 始终下载最新源码作为基准
         echo "下载最新原始代码..."
-        curl -s -o _worker_original.js https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js
+        curl -s -o _worker.js https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js
         
-        if [ -f _worker_original.js ] && [ -s _worker_original.js ]; then
+        if [ -f _worker.js ] && [ -s _worker.js ]; then
           echo "✅ 原始源码下载成功"
-          # 使用原始代码作为工作副本
-          cp _worker_original.js _worker.js
+          # 备份原始文件
+          cp _worker.js _worker_original.js
           echo "original_downloaded=true" >> $GITHUB_OUTPUT
         else
           echo "⚠️ 原始源码下载失败，使用当前版本"
