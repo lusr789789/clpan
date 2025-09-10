@@ -17,13 +17,19 @@ const KV_PATCHES = {
                     // 当 env 中没有 proxy 设置时，再回退去 KV 读取
                     const kvProxy = await env.KV.get('PROXYIP');
                     if (kvProxy) {
-                        const lines = kvProxy.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);
-                        proxyIP = lines.length > 0 ? lines[0] : '';
-                        try {
-                            proxyIPPool = (await 整理(kvProxy)).filter(Boolean);
-                        } catch (err) {
-                            console.error('解析 KV PROXYIP 生成 proxyIPPool 失败:', err);
-                            proxyIPPool = kvProxy.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);
+                        // 提取有效的IP地址行（忽略注释和空行）
+                        const lines = kvProxy.split(/\\r?\\n/)
+                            .map(l => l.trim())
+                            .filter(line => line && !line.startsWith('#') && !line.startsWith('//') && line.includes(':'));
+                        
+                        if (lines.length > 0) {
+                            proxyIP = lines[0];
+                            try {
+                                proxyIPPool = (await 整理(kvProxy)).filter(Boolean);
+                            } catch (err) {
+                                console.error('解析 KV PROXYIP 生成 proxyIPPool 失败:', err);
+                                proxyIPPool = lines.filter(Boolean);
+                            }
                         }
                     }
                 }`,
