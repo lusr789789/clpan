@@ -4,8 +4,8 @@ name: Deploy EdgeTunnel Worker
 on:
   push:
 分支:
-      - main       # 修正为英文 branches，确保 push 到 main 分支时触发
-  workflow_dispatch: {} # 手动触发
+      - main       # line 7
+  workflow_dispatch: {} 
 
 jobs:
   deploy:
