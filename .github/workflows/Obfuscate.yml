@@ -1,99 +1,112 @@
-name: 构建 BPB 面板
+name: 混淆最新版本源码并集成KV支持
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
   schedule:
-    - cron: "0 1 * * *" # 每天凌晨 1 点 UTC 时间运行
-
-permissions:
-  contents: write
+    - cron: '0 2 * * *'  # 每天UTC时间2点自动运行
 
 jobs:
-  build:
+  obfuscate-and-update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 设置 Node.js 环境
-        uses: actions/setup-node@v4
+        uses: actions/checkout@v3
         with:
-          node-version: "latest"
+          fetch-depth: 0
 
-      - name: 获取最新版本号（第一个 tag_name）
-        id: get_latest_version
+      - name: 设置Node.js环境
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: 安装依赖
         run: |
-          # 获取第一个 tag_name（无需排序）
-          LATEST_RELEASE=$(curl -s https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases | jq -r '.[0].tag_name')
+          npm install -g javascript-obfuscator
+          npm install axios
 
-          # 去掉前缀 v
-          LATEST_RELEASE=$(echo "${LATEST_RELEASE}" | sed 's/^v//')
-
-          echo "Latest release from API: ${LATEST_RELEASE}"
-          echo "latest_version=${LATEST_RELEASE}" >> $GITHUB_ENV
-
-      - name: 检查 update.txt 是否存在
-        id: check_update_txt
+      - name: 备份原始文件
         run: |
-          if [ -f "update.txt" ]; then
-            echo "update.txt 存在"
-            echo "update_txt_exists=true" >> $GITHUB_ENV
+          if [ -f "_worker.js" ]; then
+            cp _worker.js _worker.js.backup.$(date +%Y%m%d_%H%M%S)
+            echo "✅ 原始文件已备份"
+          fi
+
+      - name: 下载最新官方源码
+        run: |
+          # 替换为实际的官方源码URL
+          OFFICIAL_URL="https://github.com/cmliu/edgetunnel/blob/main/_worker.js"
+          curl -s "$OFFICIAL_URL" -o 明文源码.js
+          
+          if [ ! -s "明文源码.js" ]; then
+            echo "❌ 下载官方源码失败"
+            exit 1
+          fi
+          echo "✅ 官方源码下载成功"
+
+      - name: 混淆代码
+        run: |
+          javascript-obfuscator 明文源码.js --output _worker_temp.js \
+          --compact true \
+          --control-flow-flattening true \
+          --control-flow-flattening-threshold 1 \
+          --dead-code-injection true \
+          --dead-code-injection-threshold 1 \
+          --identifier-names-generator hexadecimal \
+          --rename-globals true \
+          --string-array true \
+          --string-array-encoding 'rc4' \
+          --string-array-threshold 1 \
+          --transform-object-keys true \
+          --unicode-escape-sequence true
+          
+          echo "✅ 代码混淆完成"
+
+      - name: 应用KV支持功能
+        run: |
+          # 使用Node.js脚本应用KV支持
+          node update_kv_worker.js _worker_temp.js _worker.js
+          
+          # 清理临时文件
+          rm -f _worker_temp.js 明文源码.js
+          echo "✅ KV支持功能已应用"
+
+      - name: 验证语法
+        run: node -c _worker.js
+
+      - name: 测试KV功能
+        run: |
+          # 验证KV相关功能是否存在
+          if grep -q "env\.KV" _worker.js && grep -q "PROXYIP" _worker.js; then
+            echo "✅ KV功能验证通过"
           else
-            echo "update.txt 不存在"
-            echo "update_txt_exists=false" >> $GITHUB_ENV
+            echo "❌ KV功能未正确应用"
+            exit 1
           fi
-
-      - name: 读取 update.txt 中的版本号（如果文件存在）
-        if: env.update_txt_exists == 'true'
-        id: read_update_txt
-        run: |
-          CURRENT_VERSION=$(cat update.txt)
-          # 去掉前缀 v
-          CURRENT_VERSION=$(echo "${CURRENT_VERSION}" | sed 's/^v//')
-          echo "current_version=${CURRENT_VERSION}" >> $GITHUB_ENV
-          echo "Current version in update.txt: ${CURRENT_VERSION}"
-
-      - name: 判断是否需要更新
-        id: check_need_update
-        run: |
-          NEED_UPDATE="false"
-          if [[ "${{ env.update_txt_exists }}" == "false" || "${{ env.current_version }}" != "${{ env.latest_version }}" ]]; then
-            NEED_UPDATE="true"
-          fi
-          echo "Need update: ${NEED_UPDATE}"
-          echo "need_update=${NEED_UPDATE}" >> $GITHUB_ENV
-
-      - name: 停止更新（如果无需更新）
-        if: env.need_update == 'false'
-        run: |
-          echo "版本未更新，放弃后续步骤"
-          exit 0
-
-      - name: 下载最新 JS 文件
-        if: env.need_update == 'true'
-        run: |
-          DOWNLOAD_URL="https://github.com/bia-pain-bache/BPB-Worker-Panel/releases/download/v${{ env.latest_version }}/worker.js"
-          echo "Downloading from URL: ${DOWNLOAD_URL}"
-          wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 5 -O latest.js "${DOWNLOAD_URL}"
-
-      - name: 替换 _worker.js
-        if: env.need_update == 'true'
-        run: |
-          mv latest.js _worker.js
-
-      - name: 更新 update.txt
-        if: env.need_update == 'true'
-        run: |
-          echo "${{ env.latest_version }}" > update.txt
 
       - name: 提交更改
-        if: env.need_update == 'true'
-        uses: stefanzweifel/git-auto-commit-action@v5
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git add _worker.js
+          if git diff --cached --quiet; then
+            echo "🟡 无文件更改，跳过提交"
+          else
+            git commit -m "🔧 [自动化] 混淆代码并集成KV支持功能 - $(date +%Y-%m-%d)"
+            echo "✅ 更改已提交"
+          fi
+
+      - name: 推送更改
+        uses: ad-m/github-push-action@master
         with:
-          branch: main
-          commit_message: ':arrow_up: 更新最新的 BPB 面板'
-          commit_author: 'github-actions[bot] <github-actions[bot]@users.noreply.github.com>'
-          push_options: '--set-upstream'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+      - name: 清理工作区
+        run: |
+          # 保留最近5个备份文件
+          ls -t _worker.js.backup.* | tail -n +6 | xargs rm -f 2>/dev/null || true
+          echo "✅ 工作区清理完成"
