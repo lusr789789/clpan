@@ -87,9 +87,9 @@ let allowInsecure = '&allowInsecure=1';
  * its intended functions without any risk of harm or data compromise.
  */
 export default {
-    async fetch(请求, env, ctx) {
+    async fetch(request, env, ctx) {
         try {
-            const UA = 请求.headers.get('User-Agent') || 'null';
+            const UA = request.headers.get('User-Agent') || 'null';
             const userAgent = UA.toLowerCase();
             userID = env.UUID || env.uuid || env.PASSWORD || env.pswd || userID;
             if (env.KEY || env.TOKEN || (userID && !isValidUUID(userID))) {
@@ -356,7 +356,7 @@ export default {
  * y formateo de salida en un contexto de aplicación web. Realiza operaciones estándar como verificar tipos de datos,
  * formatear cadenas y asegurar consistencia de datos sin riesgos de seguridad o actividades maliciosas.
  */
-async function 维列斯OverWSHandler(请求) {
+async function 维列斯OverWSHandler(request) {
 
     // @ts-ignore
     const webSocketPair = new WebSocketPair();
@@ -375,7 +375,7 @@ async function 维列斯OverWSHandler(请求) {
         console.log(`[${address}:${portWithRandomLog}] ${info}`, event || '');
     };
     // 获取早期数据头部，可能包含了一些初始化数据
-    const earlyDataHeader = 请求.headers.get('sec-websocket-protocol') || '';
+    const earlyDataHeader = request.headers.get('sec-websocket-protocol') || '';
 
     // 创建一个可读的 WebSocket 流，用于接收客户端数据
     const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
@@ -3650,7 +3650,7 @@ async function bestIP(request, env, txt = 'ADD.txt') {
                 }
             } else {
                 // 处理普通文本格式的保存请求（兼容原有功能）
-                const content = await 请求.text();
+                const content = await request.text();
                 await env.KV.put(txt, content);
                 return new Response("保存成功");
             }
