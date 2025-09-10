@@ -1,130 +1,124 @@
-name: Deploy Worker with KV ProxyIP Feature
+name: 混淆并应用KV补丁
 
 on:
-  push:
-
-  pull_request:
-
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '要处理的分支'
+        required: true
+        default: 'main'
 
 jobs:
-  deploy:
+  process:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.branch || 'main' }}
+        fetch-depth: 0
+
+    - name: 使用 Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        
-    - name: Download and prepare source code
-      id: prepare-source
+        node-version: "18"
+
+    - name: 下载最新源码
       run: |
-        echo "正在准备源码..."
-        
-        # 始终下载最新源码作为基准
         echo "下载最新原始代码..."
         curl -s -o _worker.js https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js
-        
-        if [ -f _worker.js ] && [ -s _worker.js ]; then
-          echo "✅ 原始源码下载成功"
-          # 备份原始文件
-          cp _worker.js _worker_original.js
-          echo "original_downloaded=true" >> $GITHUB_OUTPUT
-        else
-          echo "⚠️ 原始源码下载失败，使用当前版本"
-          echo "original_downloaded=false" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: Apply modifications with backup
-      id: apply-modifications
+        echo "✅ 源码下载完成"
+
+    - name: 应用KV PROXYIP补丁
+      id: apply-patch
       run: |
-        echo "开始应用修改..."
+        echo "开始应用KV PROXYIP补丁..."
         
-        # 备份原始文件
-        cp _worker.js _worker_backup.js
-        
-        # 方法1: 首先尝试使用智能脚本应用修改
-        echo "方法1: 使用智能脚本应用修改..."
+        # 方法1: 使用智能脚本
         if node scripts/apply-to-original.js; then
           echo "✅ 智能脚本应用成功"
-          echo "modification_applied=true" >> $GITHUB_OUTPUT
-          echo "method_used=smart_script" >> $GITHUB_OUTPUT
+          echo "patch_applied=true" >> $GITHUB_OUTPUT
         else
-          echo "❌ 智能脚本失败，尝试方法2: Git补丁..."
+          echo "❌ 智能脚本失败，尝试Git补丁..."
           
-          # 恢复备份
-          cp _worker_backup.js _worker.js
-          
-          # 方法2: 尝试应用Git补丁
-          if [ -f kv_proxyip_feature_correct.patch ]; then
-            if git apply --check kv_proxyip_feature_correct.patch; then
-              git apply kv_proxyip_feature_correct.patch
-              echo "✅ Git补丁应用成功"
-              echo "modification_applied=true" >> $GITHUB_OUTPUT
-              echo "method_used=git_patch" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Git补丁失败，尝试方法3: 手动模式匹配..."
-              
-              # 恢复备份
-              cp _worker_backup.js _worker.js
-              
-              # 方法3: 使用增强的模式匹配
-              if node scripts/apply-enhanced.js; then
-                echo "✅ 增强模式匹配成功"
-                echo "modification_applied=true" >> $GITHUB_OUTPUT
-                echo "method_used=enhanced_pattern" >> $GITHUB_OUTPUT
-              else
-                echo "❌ 所有自动方法都失败，需要手动干预"
-                echo "modification_applied=false" >> $GITHUB_OUTPUT
-                echo "method_used=failed" >> $GITHUB_OUTPUT
-                
-                # 恢复为原始代码，至少保证可以部署
-                cp _worker_backup.js _worker.js
-              fi
-            fi
+          # 方法2: Git补丁
+          if [ -f kv_proxyip_feature_correct.patch ] && git apply --check kv_proxyip_feature_correct.patch; then
+            git apply kv_proxyip_feature_correct.patch
+            echo "✅ Git补丁应用成功"
+            echo "patch_applied=true" >> $GITHUB_OUTPUT
           else
-            echo "❌ 补丁文件不存在"
-            echo "modification_applied=false" >> $GITHUB_OUTPUT
-            echo "method_used=no_patch" >> $GITHUB_OUTPUT
+            echo "❌ 所有补丁方法失败"
+            echo "patch_applied=false" >> $GITHUB_OUTPUT
+            exit 1
           fi
         fi
+
+    - name: 安装混淆工具
+      run: npm install -g javascript-obfuscator
+
+    - name: 混淆代码
+      run: |
+        echo "开始混淆代码..."
         
-        # 清理备份文件
-        rm -f _worker_backup.js _worker_original.js
+        # 备份补丁后的代码
+        cp _worker.js _worker_patched.js
         
-    - name: Upload modified source code
-      if: steps.apply-modifications.outputs.modification_applied == 'true'
+        # 混淆处理
+        javascript-obfuscator _worker_patched.js --output _worker.js \
+          --compact true \
+          --control-flow-flattening true \
+          --control-flow-flattening-threshold 0.7 \
+          --dead-code-injection true \
+          --dead-code-injection-threshold 0.4 \
+          --identifier-names-generator hexadecimal \
+          --rename-globals true \
+          --self-defending true \
+          --string-array true \
+          --string-array-encoding 'rc4' \
+          --string-array-threshold 0.7 \
+          --transform-object-keys true \
+          --unicode-escape-sequence true
+        
+        echo "✅ 代码混淆完成"
+
+    - name: 验证结果
+      run: |
+        if [ -f _worker.js ] && [ -s _worker.js ]; then
+          echo "✅ 最终文件生成成功"
+          echo "文件大小: $(wc -c < _worker.js) 字节"
+          echo "包含KV功能: $(grep -c 'PROXYIP' _worker.js || echo 0)"
+        else
+          echo "❌ 文件生成失败"
+          exit 1
+        fi
+
+    - name: 提交更改
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add _worker.js
+        
+        if git diff --cached --quiet; then
+          echo "没有文件更改，跳过提交"
+        else
+          git commit -m "chore: 应用KV补丁并混淆代码 [自动化]"
+          echo "✅ 更改已提交"
+        fi
+
+    - name: 推送更改
+      if: success()
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.event.inputs.branch || 'main' }}
+
+    - name: 上传制品
       uses: actions/upload-artifact@v4
       with:
-        name: modified-worker
-        path: _worker.js
-        retention-days: 1
-
-    - name: Show modification summary
-      run: |
-        echo "✅ 源代码修改完成!"
-        echo "使用的方法: ${{ steps.apply-modifications.outputs.method_used }}"
-        echo "修改后的文件已保存为制品: modified-worker"
-        echo "可以直接使用或手动部署到Cloudflare"
-        
-    - name: Notify on Failure
-      if: failure()
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const message = '🚨 源代码修改失败！请检查补丁是否与最新代码冲突。';
-          
-          if (context.payload.pull_request) {
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: message + ' PR: #' + context.payload.pull_request.number
-            });
-          }
-          
-          console.log('修改失败通知已准备');
+        name: processed-worker
+        path: |
+          _worker.js
+          _worker_patched.js
+        retention-days: 7
