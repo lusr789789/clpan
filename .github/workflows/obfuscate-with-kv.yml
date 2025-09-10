@@ -43,11 +43,29 @@ jobs:
 
       - name: 注入自定义 proxy 初始化到 _worker_official.js
         run: |
-          if [ -f "scripts/injectProxyInit.js" ]; then
-            node scripts/injectProxyInit.js
-            echo "✅ 已运行注入器脚本"
+          if [ -f "scripts/injectProxyInit.js" ] && [ -f "_worker_official.js" ]; then
+            node scripts/injectProxyInit.js _worker_official.js
+            echo "✅ 已对 _worker_official.js 运行注入器脚本"
           else
-            echo "⚠️ injectProxyInit.js 不存在，跳过注入"
+            echo "⚠️ injectProxyInit.js 或 _worker_official.js 不存在，跳过注入"
+          fi
+
+      - name: 修复Unicode转义序列（针对 _worker_official.js）
+        run: |
+          if [ -f "fix_unicode.js" ] && [ -f "_worker_official.js" ]; then
+            node fix_unicode.js _worker_official.js
+            echo "✅ Unicode转义序列已修复 (_worker_official.js)"
+          else
+            echo "⚠️ fix_unicode.js 或 _worker_official.js 不存在，跳过Unicode修复"
+          fi
+
+      - name: 将 _worker_official.js 重命名为 _worker.js
+        run: |
+          if [ -f "_worker_official.js" ]; then
+            mv -f _worker_official.js _worker.js
+            echo "✅ 已将 _worker_official.js 重命名为 _worker.js"
+          else
+            echo "⚠️ _worker_official.js 不存在，跳过重命名"
           fi
 
       - name: 验证文件
