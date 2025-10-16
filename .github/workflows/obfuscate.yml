@@ -3,7 +3,7 @@ name: Generate and Obfuscate Worker Script
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 * * * *' # 每小时运行一次，可根据需要修改
 
 jobs:
   build-and-obfuscate:
@@ -18,26 +18,32 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Obfuscator
+      - name: Install JavaScript Obfuscator
         run: npm install javascript-obfuscator
 
-      - name: Obfuscate from local source file
+      - name: Obfuscate Cloudflare Worker source file
         run: |
           node -e "
             const JavaScriptObfuscator = require('javascript-obfuscator');
             const fs = require('fs');
             const path = require('path');
 
-            const sourceFileName = 'cfproxy.js';
-            const outputFileName = '_worker.js';
-            const sourceFilePath = path.join(process.cwd(), sourceFileName);
+            const sourceFileName = 'cfproxy.js'; // 原始源文件名
+            const outputFileName = '_worker.js'; // 输出文件名
+            const sourcePath = path.join(process.cwd(), sourceFileName);
 
-            if (!fs.existsSync(sourceFilePath)) {
-              console.error('错误：未找到源文件。');
+            if (!fs.existsSync(sourcePath)) {
+              console.error('❌ 错误：未找到源文件 ' + sourceFileName);
               process.exit(1);
             }
 
-            const originalCode = fs.readFileSync(sourceFilePath, 'utf8');
+            const originalCode = fs.readFileSync(sourcePath, 'utf8');
+            if (!originalCode.trim()) {
+              console.error('❌ 错误：源文件为空');
+              process.exit(1);
+            }
+
+            // ✅ Cloudflare Worker 兼容的混淆配置
             const obfuscationOptions = {
               compact: true,
               controlFlowFlattening: true,
@@ -47,18 +53,27 @@ jobs:
               stringArray: true,
               stringArrayEncoding: ['base64'],
               stringArrayThreshold: 0.75,
-              renameGlobals: true,
+              renameGlobals: false, // ❗ 禁止混淆全局函数
               identifierNamesGenerator: 'mangled',
               numbersToExpressions: true,
               splitStrings: true,
               splitStringsChunkLength: 10,
               transformObjectKeys: true,
               selfDefending: false,
-              debugProtection: false
+              debugProtection: false,
+              target: 'browser', // ✅ Worker 环境兼容
+              reservedNames: [
+                '^fetch$', '^Request$', '^Response$', '^addEventListener$', '^event$', '^handleRequest$'
+              ]
             };
-            const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
-            fs.writeFileSync(outputFileName, obfuscatedCode, 'utf8');
-            console.log('✅ 混淆完成并保存至 ' + outputFileName);
+
+            const obfuscatedCode = JavaScriptObfuscator.obfuscate(
+              originalCode,
+              obfuscationOptions
+            ).getObfuscatedCode();
+
+            fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
+            console.log('✅ 已混淆完成，输出至：' + outputFileName);
           "
 
       - name: Commit and push the obfuscated file
@@ -67,8 +82,9 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add '_worker.js'
           if git diff --staged --quiet; then
-            echo "No changes to commit."
+            echo '✅ 无需更新，混淆文件已是最新版本。'
           else
-            git commit -m "build: Generate and obfuscate worker script"
+            git commit -m 'build: Generate and obfuscate worker script'
             git push
+            echo '🚀 已提交新的混淆版本。'
           fi
