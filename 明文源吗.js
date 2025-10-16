@@ -603,7 +603,7 @@ async function handleSubscriptionRequest(request, user, url = null) {
     try {
         const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
         finalLinks.push(...generateLinksFromSource(nativeList, user, workerDomain));
-    } catch (error) {
+    } catch (e) {
         const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
         finalLinks.push(...generateLinksFromSource(nativeList, user, workerDomain));
     }
@@ -799,7 +799,7 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc) {
 			},
 			abort(reason) { console.error("Readable aborted:", reason); },
 		})
-	).catch((error) => { console.error("Stream connection error:", error); closeSocketQuietly(webSocket); });
+	).catch((e) => { console.error("Stream connection error:", e); closeSocketQuietly(webSocket); });
 	if (!hasData && retryFunc) retryFunc();
 }
 
@@ -818,7 +818,7 @@ async function forwardUDP(udpChunk, webSocket, respHeader) {
 				}
 			},
 		}));
-	} catch (error) { console.error(`DNS forward error: ${error.message}`); }
+	} catch (e) { console.error(`DNS forward error: ${e.message}`); }
 }
 
 
@@ -1104,8 +1104,8 @@ async function handleSubscriptionPage(request, user = null) {
                         alert("Base64订阅内容已复制");
                     });
                 })
-                .catch(function(error) {
-                    console.error("获取订阅失败:", error);
+                .catch(function(e) {
+                    console.error("获取订阅失败:", e);
                     alert("获取订阅失败，请重试");
                 });
         }
@@ -1185,8 +1185,8 @@ async function handleSubscriptionPage(request, user = null) {
                     regionStatus.innerHTML = '服务状态: <span style="color: #ff4444;">❌ 检测失败</span>';
                 }
 
-            } catch (error) {
-                console.error('状态检测失败:', error);
+            } catch (e) {
+                console.error('状态检测失败:', e);
                 document.getElementById('regionStatus').innerHTML = '服务状态: <span style="color: #ff4444;">❌ 检测失败</span>';
                 document.getElementById('geoInfo').innerHTML = '运行模式: <span style="color: #ff4444;">❌ 检测失败</span>';
                 document.getElementById('backupStatus').innerHTML = '备用地址: <span style="color: #ff4444;">❌ 检测失败</span>';
@@ -1214,10 +1214,10 @@ async function handleSubscriptionPage(request, user = null) {
 function base64ToArray(b64Str) {
 	if (!b64Str) return { error: null };
 	try { b64Str = b64Str.replace(/-/g, '+').replace(/_/g, '/'); return { earlyData: Uint8Array.from(atob(b64Str), (c) => c.charCodeAt(0)).buffer, error: null }; } 
-    catch (error) { return { error }; }
+    catch (e) { return { error: e }; }
 }
 
-function closeSocketQuietly(socket) { try { if (socket.readyState === 1 || socket.readyState === 2) socket.close(); } catch (error) {} }
+function closeSocketQuietly(socket) { try { if (socket.readyState === 1 || socket.readyState === 2) socket.close(); } catch (e) {} }
 
 const hexTable = Array.from({ length: 256 }, (v, i) => (i + 256).toString(16).slice(1));
 function formatIdentifier(arr, offset = 0) {
