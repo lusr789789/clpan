@@ -28,8 +28,8 @@ jobs:
             const fs = require('fs');
             const path = require('path');
 
-            const sourceFileName = 'cfproxy.js'; // 原始源文件名（请按需修改）
-            const outputFileName = '_worker.js'; // 输出文件名（请按需修改）
+            const sourceFileName = 'cfproxy.js';
+            const outputFileName = '_worker.js';
             const sourcePath = path.join(process.cwd(), sourceFileName);
 
             if (!fs.existsSync(sourcePath)) {
@@ -38,96 +38,60 @@ jobs:
             }
 
             const originalCode = fs.readFileSync(sourcePath, 'utf8');
-            if (!originalCode || !originalCode.trim()) {
+            if (!originalCode.trim()) {
               console.error('❌ 错误：源文件为空');
               process.exit(1);
             }
 
-            // ================================
-            // Worker 兼容（更安全）的混淆配置
-            // ================================
             const obfuscationOptions = {
               compact: true,
-
-              // 下面两项可能引发作用域/重写问题 —— 默认关闭以避免 "assign to const" 错误
               controlFlowFlattening: false,
               deadCodeInjection: false,
-
-              // 字符串数组（适度开启）
               stringArray: true,
               stringArrayEncoding: false,
               stringArrayThreshold: 0.75,
               rotateStringArray: true,
-
-              // 不重命名全局，避免混淆 Worker 全局 API
               renameGlobals: false,
-
-              // 将 identifier 混淆为短名，但避免过度破坏作用域
               identifierNamesGenerator: 'mangled',
-
-              // 以下项为安全起见默认关闭或保守设置
               numbersToExpressions: false,
               transformObjectKeys: false,
               splitStrings: false,
               selfDefending: false,
               debugProtection: false,
               unicodeEscapeSequence: false,
-
-              // 确保目标为浏览器 / Worker 环境
               target: 'browser',
-
-              // 保留核心名字（避免混淆 Worker 入口与常用全局）
               reservedNames: [
-                '^fetch$',
-                '^Request$',
-                '^Response$',
-                '^addEventListener$',
-                '^removeEventListener$',
-                '^event$',
-                '^handleRequest$',
-                '^ENV$',
-                '^globalThis$'
+                '^fetch$', '^Request$', '^Response$', '^addEventListener$', '^removeEventListener$', '^event$', '^handleRequest$', '^ENV$', '^globalThis$'
               ],
-
-              // 其他保留字符串（可按需添加）
               reservedStrings: []
             };
 
             const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
-
             fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
             console.log('✅ 已混淆完成，输出至：' + outputFileName);
           "
 
-      - name: Quick parse check for generated worker (syntax)
+      - name: Quick parse check for generated worker
         run: |
-          # 在推送前做个快速函数包装解析检查，捕获明显的语法错误
           node -e "
             const fs = require('fs');
             try {
               const code = fs.readFileSync('_worker.js','utf8');
-              // 通过 new Function 尝试解析（不会执行模块顶层运行代码）
               new Function(code);
               console.log('✅ _worker.js 语法解析通过');
             } catch (err) {
-              console.error('❌ _worker.js 语法解析失败:', err && err.message);
+              console.error('❌ _worker.js 语法解析失败:', err.message);
               process.exit(2);
             }
           "
 
       - name: Optional: replace problematic const -> let (use with caution)
-        if: failure() == false
         run: |
-          # 有时混淆会把原本应为 let 的变量变成 const 导致后续赋值失败。
-          # 这个步骤是可选且有风险的：会把文件中的 `const <single-letter>` 简单替换为 let，谨慎启用。
-          # 如果你不想自动替换，请把下面这段注释掉或删除此步骤。
           if [ -f "_worker.js" ]; then
-            # 仅做非常保守的替换：把 `const I=` 这种单字母 const 替为 let（可根据日志中报错的名字改）
-            # 你可以把 I h j 替成你日志里报错的变量名
-            sed -E -i.bak -e 's/\\bconst\\s+I\\s*=\\s*/let I = /g' _worker.js || true
-            sed -E -i.bak -e 's/\\bconst\\s+h\\s*=\\s*/let h = /g' _worker.js || true
-            sed -E -i.bak -e 's/\\bconst\\s+j\\s*=\\s*/let j = /g' _worker.js || true
-            echo '✅ 已应用可选的 const->let 保守替换（同时生成 .bak 备份）'
+            sed -E -i.bak -e 's/\bconst\s+I\s*=\s*/let I = /g' _worker.js || true
+            sed -E -i.bak -e 's/\bconst\s+h\s*=\s*/let h = /g' _worker.js || true
+            sed -E -i.bak -e 's/\bconst\s+j\s*=\s*/let j = /g' _worker.js || true
+            echo '✅ 已应用保守 const→let 替换（生成 .bak 备份）'
           fi
 
       - name: Commit and push the obfuscated file
@@ -135,7 +99,6 @@ jobs:
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add '_worker.js' || true
-          # 如果替换生成了备份文件，也一并加入（可选）
           git add '_worker.js.bak' || true
           if git diff --staged --quiet; then
             echo '✅ 无需更新，混淆文件已是最新版本。'
