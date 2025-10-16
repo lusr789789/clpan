@@ -33,22 +33,40 @@ jobs:
           const sourcePath = path.join(process.cwd(), sourceFileName);
 
           if (!fs.existsSync(sourcePath)) {
-            console.error('❌ 未找到源文件');
+            console.error('❌ 未找到源文件:', sourceFileName);
             process.exit(1);
           }
 
-          const originalCode = fs.readFileSync(sourcePath, 'utf8');
-          if (!originalCode.trim()) {
+          let originalCode = fs.readFileSync(sourcePath, 'utf8');
+          if (!originalCode || !originalCode.trim()) {
             console.error('❌ 源文件为空');
             process.exit(1);
           }
+
+          // === CUSTOM MODIFICATION / INSERTION POINT ===
+          // 在这里“恰一截”并替换为你的自定义代码片段（或对 originalCode 做预处理）。
+          //
+          // 注意事项（非常重要）：
+          // 1) 只替换下面三行注释（不要删除 EOF 或其他外层结构）。
+          // 2) 你的代码应保持与当前缩进（10 个空格）对齐（这里的缩进是为了可读性；在这里-doc 中缩进不会影响运行）。
+          // 3) 如果你的代码包含单引号或双引号，不会影响这里-doc（因为使用了 <<'EOF'），但请确保你的 JS 语法正确。
+          // 4) 示例：如果想在混淆前替换字符串可以写：
+          //      originalCode = originalCode.replace(/FOO/g, 'BAR');
+          //
+          // ======= BEGIN INSERT HERE =======
+          // （将这段注释整段替换为你的 JS 代码）
+          //
+          // =======  END INSERT HERE  =======
+          //
+          // 替换完成后继续下面的混淆流程。
+          // =================================
 
           const obfuscationOptions = {
             compact: true,
             controlFlowFlattening: false,
             deadCodeInjection: false,
             stringArray: true,
-            stringArrayEncoding: false,
+            stringArrayEncoding: ['base64'],
             stringArrayThreshold: 0.75,
             rotateStringArray: true,
             renameGlobals: false,
@@ -61,8 +79,17 @@ jobs:
             unicodeEscapeSequence: false,
             target: 'browser',
             reservedNames: [
-              '^fetch$', '^Request$', '^Response$', '^addEventListener$', '^removeEventListener$', '^event$', '^handleRequest$', '^ENV$', '^globalThis$'
-            ]
+              '^fetch$',
+              '^Request$',
+              '^Response$',
+              '^addEventListener$',
+              '^removeEventListener$',
+              '^event$',
+              '^handleRequest$',
+              '^ENV$',
+              '^globalThis$'
+            ],
+            reservedStrings: []
           };
 
           const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
@@ -79,12 +106,21 @@ jobs:
             new Function(code);
             console.log('✅ _worker.js 语法解析通过');
           } catch (err) {
-            console.error('❌ _worker.js 语法解析失败:', err.message);
+            console.error('❌ _worker.js 语法解析失败:', err && err.message);
             process.exit(2);
           }
           EOF
 
-
+      - name: Optional: replace problematic const -> let
+        run: |
+          if [ -f "_worker.js" ]; then
+            # 下面示例为保守替换：只针对日志中常见的单字符 const 名（I, h, j）
+            # 如果你不需要，请删掉或注释这些 sed 行
+            sed -E -i.bak -e 's/\bconst\s+I\s*=\s*/let I = /g' _worker.js || true
+            sed -E -i.bak -e 's/\bconst\s+h\s*=\s*/let h = /g' _worker.js || true
+            sed -E -i.bak -e 's/\bconst\s+j\s*=\s*/let j = /g' _worker.js || true
+            echo '✅ 已应用保守 const->let 替换（生成 .bak 备份）'
+          fi
 
       - name: Commit and push the obfuscated file
         run: |
