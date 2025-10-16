@@ -33,7 +33,7 @@ jobs:
             const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
             if (!fs.existsSync(sourceFilePath)) {
-              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保您的仓库根目录有名为 \'明文源吗\' 的文件。');
+              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保您的仓库根目录有名为 \'' + sourceFileName + '\' 的文件。');
               process.exit(1);
             }
 
@@ -44,7 +44,7 @@ jobs:
               process.exit(1);
             }
 
-            // --- 最终平衡型混淆配置 ---
+            // --- 混淆配置（方案 B：避免 const 冲突） ---
             const obfuscationOptions = {
                 compact: true,
                 controlFlowFlattening: true,
@@ -54,14 +54,15 @@ jobs:
                 stringArray: true,
                 stringArrayEncoding: ['base64'],
                 stringArrayThreshold: 0.75,
-                renameGlobals: true,
+                renameGlobals: false,  // 关闭全局重命名
                 identifierNamesGenerator: 'mangled',
                 numbersToExpressions: true,
                 splitStrings: true,
                 splitStringsChunkLength: 10,
                 transformObjectKeys: true,
                 selfDefending: false,
-                debugProtection: false
+                debugProtection: false,
+                reservedNames: ['^h$', '^i$', '^j$', '^k$', '^l$', '^f$', '^g$'] // 保留关键变量名
             };
 
             const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
