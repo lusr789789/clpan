@@ -44,24 +44,19 @@ jobs:
               process.exit(1);
             }
 
-            // --- 最终平衡型混淆配置 ---
+            // --- 兼容性优先混淆配置 ---
             const obfuscationOptions = {
                 compact: true,
-                controlFlowFlattening: true,
-                controlFlowFlatteningThreshold: 0.75,
-                deadCodeInjection: true,
-                deadCodeInjectionThreshold: 0.4,
-                stringArray: true,
-                stringArrayEncoding: ['base64'],
-                stringArrayThreshold: 0.75,
-                renameGlobals: true,
-                identifierNamesGenerator: 'mangled',
-                numbersToExpressions: true,
-                splitStrings: true,
-                splitStringsChunkLength: 10,
-                transformObjectKeys: true,
-                selfDefending: false,
-                debugProtection: false
+                controlFlowFlattening: false,
+                deadCodeInjection: false,
+                stringArray: false,
+                renameGlobals: false,
+                identifierNamesGenerator: 'hexadecimal',
+                rotateStringArray: false,
+                shuffleStringArray: false,
+                unicodeEscapeSequence: false,
+                simplify: true,
+                target: 'browser'
             };
 
             const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
