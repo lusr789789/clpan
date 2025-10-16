@@ -3,10 +3,6 @@ import { connect } from 'cloudflare:sockets';
 let authToken = '5c240cb3-0c29-491a-ad03-32a30aafe25d';
 let fallbackAddress = '';
 let fallbackPort = '443';
-// 动态设置的变量
-let dynamicFallbackAddress = '';
-let dynamicFallbackPort = '443';
-
 
 
 const E_INVALID_DATA = atob('aW52YWxpZCBkYXRh');
@@ -56,207 +52,75 @@ function parseAddressAndPort(input) {
     return { address: input, port: null };
 }
 
-export default {
+const worker = {
 	async fetch(request, env) {
 		const subPath = authToken.toLowerCase();
 
-
-		// 只使用动态设置的值
-		if (dynamicFallbackAddress) {
-			fallbackAddress = dynamicFallbackAddress;
-			fallbackPort = dynamicFallbackPort;
+		// 从环境变量获取配置(支持 P/p 参数)
+		const envProxyIP = env.P || env.p;
+		if (envProxyIP && envProxyIP.trim()) {
+			const parseResult = parseAddressAndPort(envProxyIP.trim());
+			if (parseResult && parseResult.address) {
+				fallbackAddress = parseResult.address;
+				fallbackPort = parseResult.port ? parseResult.port.toString() : '443';
+			}
 		}
-
-
-
 
 		const url = new URL(request.url);
 
-		if (request.headers.get('Upgrade') === 'websocket') {
-				return await handleWsRequest(request);
-			} else if (request.method === 'GET') {
-				if (url.pathname === '/region') {
-					// 检查动态设置的值
-					if (dynamicFallbackAddress && dynamicFallbackAddress.trim()) {
-						const currentAddress = dynamicFallbackPort !== '443'
-							? `${dynamicFallbackAddress}:${dynamicFallbackPort}`
-							: dynamicFallbackAddress;
+		// 检查 URL 路径中的 /proxyip= 参数,直接设置 ProxyIP
+		if (url.pathname.includes('/proxyip=')) {
+			const match = url.pathname.match(/\/proxyip=([^\/]+)/);
+			if (match && match[1]) {
+				const proxyipValue = decodeURIComponent(match[1]);
+				const parseResult = parseAddressAndPort(proxyipValue.trim());
+				if (parseResult && parseResult.address) {
+					fallbackAddress = parseResult.address;
+					fallbackPort = parseResult.port ? parseResult.port.toString() : '443';
+				}
+				// 清理 URL 路径,移除 /proxyip=xxx 部分继续处理后续路由
+				url.pathname = url.pathname.replace(/\/proxyip=[^\/]+/, '');
+			}
+		}
 
+		// WebSocket 连接优先处理
+		if (request.headers.get('Upgrade') === 'websocket') {
+			return await handleWsRequest(request);
+		}
+
+		// 处理 HTTP GET 请求
+		if (request.method === 'GET') {
+				if (url.pathname === '/region') {
+					// 检查环境变量设置
+					const envProxyIP = env.P || env.p;
+					if (envProxyIP && envProxyIP.trim()) {
 						return new Response(JSON.stringify({
-							mode: 'DYNAMIC',
-							detectionMethod: '动态设置模式',
-							customIP: currentAddress,
-							source: 'URL参数设置',
+							mode: 'ENV_CONFIG',
+							detectionMethod: '环境变量配置',
+							customIP: envProxyIP.trim(),
+							source: '环境变量 P/p',
 							timestamp: new Date().toISOString()
 						}), {
 							headers: { 'Content-Type': 'application/json' }
 						});
-					} else {
+					} else if (fallbackAddress && fallbackAddress.trim()) {
 						return new Response(JSON.stringify({
 							mode: 'DEFAULT',
-							detectionMethod: '默认模式',
+							detectionMethod: '默认配置',
+							customIP: fallbackAddress + ':' + fallbackPort,
+							source: '代码默认值',
 							timestamp: new Date().toISOString()
 						}), {
 							headers: { 'Content-Type': 'application/json' }
 						});
-					}
-				}
-				
-				
-				// 处理 /proxyip=IP 格式的请求
-				if (url.pathname.startsWith('/proxyip=')) {
-					const proxyIP = url.pathname.substring(9); // 去掉 "/proxyip=" 前缀
-
-					if (proxyIP && proxyIP.trim()) {
-					// 验证IP或域名格式
-					const inputAddress = proxyIP.trim();
-					// 支持IP地址、域名，甚至包含端口的格式
-					if (inputAddress && inputAddress.length > 0) {
-						// 解析地址和端口
-						const parseResult = parseAddressAndPort(inputAddress);
-
-						if (parseResult && parseResult.address && parseResult.address.length > 0) {
-							// 更新动态变量
-							dynamicFallbackAddress = parseResult.address;
-							dynamicFallbackPort = parseResult.port ? parseResult.port.toString() : '443'; // 使用提供的端口或默认端口
-
-							// 同时更新当前运行的变量
-							fallbackAddress = dynamicFallbackAddress;
-							fallbackPort = dynamicFallbackPort;
-
-							// 返回成功响应
-							const responseHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>代理IP设置成功</title>
-    <style>
-        body {
-            font-family: "Courier New", monospace;
-            background: #000; color: #00ff00;
-            display: flex; justify-content: center; align-items: center;
-            min-height: 100vh; margin: 0;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-            border: 2px solid #00ff00;
-            border-radius: 10px;
-            background: rgba(0, 20, 0, 0.9);
-            box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
-        }
-        .success { font-size: 24px; margin-bottom: 20px; }
-        .ip { font-size: 18px; margin-bottom: 30px; color: #00ffff; }
-        .countdown { font-size: 16px; color: #ffff00; }
-        a { color: #00ff00; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="success">✅ 代理IP设置成功</div>
-        <div class="ip">已设置代理地址: ${fallbackAddress}:${fallbackPort}</div>
-        <div class="ip" style="color: #ffff00; font-size: 14px; margin-top: 10px;">优先级: 动态设置 (最高优先级)</div>
-        <div class="countdown">3秒后自动跳转到首页...</div>
-        <script>
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 3000);
-        </script>
-        <p><a href="/">立即返回首页</a></p>
-    </div>
-</body>
-</html>`;
-
-							return new Response(responseHtml, {
-								status: 200,
-								headers: { 'Content-Type': 'text/html; charset=utf-8' }
-							});
-						} else {
-							// IP格式无效
-							const errorHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IP格式错误</title>
-    <style>
-        body {
-            font-family: "Courier New", monospace;
-            background: #000; color: #ff4444;
-            display: flex; justify-content: center; align-items: center;
-            min-height: 100vh; margin: 0;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-            border: 2px solid #ff4444;
-            border-radius: 10px;
-            background: rgba(20, 0, 0, 0.9);
-            box-shadow: 0 0 30px rgba(255, 68, 68, 0.5);
-        }
-        .error { font-size: 24px; margin-bottom: 20px; }
-        .ip { font-size: 18px; margin-bottom: 30px; color: #ff6666; }
-        a { color: #ff4444; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="error">❌ IP格式错误</div>
-        <div class="ip">无效的IP地址: ${proxyIP}</div>
-        <p><a href="/">返回首页</a></p>
-    </div>
-</body>
-</html>`;
-
-							return new Response(errorHtml, {
-								status: 400,
-								headers: { 'Content-Type': 'text/html; charset=utf-8' }
-							});
-						}
 					} else {
-						// 没有提供IP
-						const errorHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>缺少IP参数</title>
-    <style>
-        body {
-            font-family: "Courier New", monospace;
-            background: #000; color: #ffaa00;
-            display: flex; justify-content: center; align-items: center;
-            min-height: 100vh; margin: 0;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-            border: 2px solid #ffaa00;
-            border-radius: 10px;
-            background: rgba(20, 10, 0, 0.9);
-            box-shadow: 0 0 30px rgba(255, 170, 0, 0.5);
-        }
-        .warning { font-size: 24px; margin-bottom: 20px; }
-        .format { font-size: 18px; margin-bottom: 30px; color: #ffcc66; }
-        a { color: #ffaa00; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="warning">⚠️ 缺少IP参数</div>
-        <div class="format">请使用正确的格式: /proxyip=18.183.172.12</div>
-        <p><a href="/">返回首页</a></p>
-    </div>
-</body>
-</html>`;
-
-						return new Response(errorHtml, {
-							status: 400,
-							headers: { 'Content-Type': 'text/html; charset=utf-8' }
+						return new Response(JSON.stringify({
+							mode: 'NOT_SET',
+							detectionMethod: '未配置',
+							message: '请通过环境变量 P 或 p 设置 ProxyIP',
+							timestamp: new Date().toISOString()
+						}), {
+							headers: { 'Content-Type': 'application/json' }
 						});
 					}
 				}
@@ -575,9 +439,10 @@ export default {
 					return await handleSubscriptionRequest(request, authToken);
 				}
 			}
-		return new Response('Not Found', { status: 404 });
-	},
-};
+			
+			return new Response('Not Found', { status: 404 });
+		}
+	};
 
 async function handleSubscriptionRequest(request, user, url = null) {
     if (!url) url = new URL(request.url);
@@ -1195,3 +1060,4 @@ function formatIdentifier(arr, offset = 0) {
 	return id;
 }
 
+export default worker;
