@@ -110,25 +110,24 @@ export default {
 					const proxyIP = url.pathname.substring(9); // 去掉 "/proxyip=" 前缀
 
 					if (proxyIP && proxyIP.trim()) {
-						try {
-							// 验证IP或域名格式
-							const inputAddress = proxyIP.trim();
-							// 支持IP地址、域名，甚至包含端口的格式
-							if (inputAddress && inputAddress.length > 0) {
-								// 解析地址和端口
-								const { address, port } = parseAddressAndPort(inputAddress);
+					// 验证IP或域名格式
+					const inputAddress = proxyIP.trim();
+					// 支持IP地址、域名，甚至包含端口的格式
+					if (inputAddress && inputAddress.length > 0) {
+						// 解析地址和端口
+						const parseResult = parseAddressAndPort(inputAddress);
 
-								if (address && address.length > 0) {
-									// 更新动态变量
-									dynamicFallbackAddress = address;
-									dynamicFallbackPort = port ? port.toString() : '443'; // 使用提供的端口或默认端口
+						if (parseResult && parseResult.address && parseResult.address.length > 0) {
+							// 更新动态变量
+							dynamicFallbackAddress = parseResult.address;
+							dynamicFallbackPort = parseResult.port ? parseResult.port.toString() : '443'; // 使用提供的端口或默认端口
 
-									// 同时更新当前运行的变量
-									fallbackAddress = dynamicFallbackAddress;
-									fallbackPort = dynamicFallbackPort;
+							// 同时更新当前运行的变量
+							fallbackAddress = dynamicFallbackAddress;
+							fallbackPort = dynamicFallbackPort;
 
-									// 返回成功响应
-									const responseHtml = `<!DOCTYPE html>
+							// 返回成功响应
+							const responseHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -172,13 +171,13 @@ export default {
 </body>
 </html>`;
 
-								return new Response(responseHtml, {
-									status: 200,
-									headers: { 'Content-Type': 'text/html; charset=utf-8' }
-								});
-							} else {
-								// IP格式无效
-								const errorHtml = `<!DOCTYPE html>
+							return new Response(responseHtml, {
+								status: 200,
+								headers: { 'Content-Type': 'text/html; charset=utf-8' }
+							});
+						} else {
+							// IP格式无效
+							const errorHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -214,18 +213,9 @@ export default {
 </body>
 </html>`;
 
-								return new Response(errorHtml, {
-									status: 400,
-									headers: { 'Content-Type': 'text/html; charset=utf-8' }
-								});
-							}
-						} catch (e) {
-							return new Response(JSON.stringify({
-								error: 'IP解析失败',
-								message: e.message
-							}), {
-								status: 500,
-								headers: { 'Content-Type': 'application/json' }
+							return new Response(errorHtml, {
+								status: 400,
+								headers: { 'Content-Type': 'text/html; charset=utf-8' }
 							});
 						}
 					} else {
