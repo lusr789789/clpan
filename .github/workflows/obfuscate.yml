@@ -84,14 +84,7 @@ jobs:
           }
           EOF
 
-      - name: Optional: replace problematic const -> let
-        run: |
-          if [ -f "_worker.js" ]; then
-            sed -E -i.bak -e 's/\bconst\s+I\s*=\s*/let I = /g' _worker.js || true
-            sed -E -i.bak -e 's/\bconst\s+h\s*=\s*/let h = /g' _worker.js || true
-            sed -E -i.bak -e 's/\bconst\s+j\s*=\s*/let j = /g' _worker.js || true
-            echo '✅ 已应用保守 const->let 替换（生成 .bak 备份）'
-          fi
+
 
       - name: Commit and push the obfuscated file
         run: |
