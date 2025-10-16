@@ -3,7 +3,7 @@ name: Generate and Obfuscate Worker Script
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # 每小时运行一次，可根据需要修改
+    - cron: '0 * * * *'
 
 jobs:
   build-and-obfuscate:
@@ -21,77 +21,51 @@ jobs:
       - name: Install JavaScript Obfuscator
         run: npm install javascript-obfuscator
 
-      - name: Obfuscate Cloudflare Worker source file
+      - name: Obfuscate Worker source file
         run: |
-          node -e "
-            const JavaScriptObfuscator = require('javascript-obfuscator');
-            const fs = require('fs');
-            const path = require('path');
-
-            const sourceFileName = 'cfproxy.js';
-            const outputFileName = '_worker.js';
-            const sourcePath = path.join(process.cwd(), sourceFileName);
-
-            if (!fs.existsSync(sourcePath)) {
-              console.error('❌ 错误：未找到源文件 ' + sourceFileName);
-              process.exit(1);
-            }
-
-            const originalCode = fs.readFileSync(sourcePath, 'utf8');
-            if (!originalCode.trim()) {
-              console.error('❌ 错误：源文件为空');
-              process.exit(1);
-            }
-
-            const obfuscationOptions = {
-              compact: true,
-              controlFlowFlattening: false,
-              deadCodeInjection: false,
-              stringArray: true,
-              stringArrayEncoding: false,
-              stringArrayThreshold: 0.75,
-              rotateStringArray: true,
-              renameGlobals: false,
-              identifierNamesGenerator: 'mangled',
-              numbersToExpressions: false,
-              transformObjectKeys: false,
-              splitStrings: false,
-              selfDefending: false,
-              debugProtection: false,
-              unicodeEscapeSequence: false,
-              target: 'browser',
-              reservedNames: [
-                '^fetch$', '^Request$', '^Response$', '^addEventListener$', '^removeEventListener$', '^event$', '^handleRequest$', '^ENV$', '^globalThis$'
-              ],
-              reservedStrings: []
-            };
-
-            const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
-            fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
-            console.log('✅ 已混淆完成，输出至：' + outputFileName);
-          "
+          node -e "const JavaScriptObfuscator = require('javascript-obfuscator');
+          const fs = require('fs');
+          const path = require('path');
+          const sourceFileName = 'cfproxy.js';
+          const outputFileName = '_worker.js';
+          const sourcePath = path.join(process.cwd(), sourceFileName);
+          if (!fs.existsSync(sourcePath)) { console.error('❌ 未找到源文件'); process.exit(1); }
+          const originalCode = fs.readFileSync(sourcePath,'utf8');
+          if (!originalCode.trim()) { console.error('❌ 源文件为空'); process.exit(1); }
+          const obfuscationOptions = {
+            compact: true,
+            controlFlowFlattening: false,
+            deadCodeInjection: false,
+            stringArray: true,
+            stringArrayEncoding: false,
+            stringArrayThreshold: 0.75,
+            rotateStringArray: true,
+            renameGlobals: false,
+            identifierNamesGenerator: 'mangled',
+            numbersToExpressions: false,
+            transformObjectKeys: false,
+            splitStrings: false,
+            selfDefending: false,
+            debugProtection: false,
+            unicodeEscapeSequence: false,
+            target: 'browser',
+            reservedNames: ['^fetch$','^Request$','^Response$','^addEventListener$','^removeEventListener$','^event$','^handleRequest$','^ENV$','^globalThis$']
+          };
+          const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
+          fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode,'utf8');
+          console.log('✅ 已混淆完成，输出至：'+outputFileName);"
 
       - name: Quick parse check for generated worker
         run: |
-          node -e "
-            const fs = require('fs');
-            try {
-              const code = fs.readFileSync('_worker.js','utf8');
-              new Function(code);
-              console.log('✅ _worker.js 语法解析通过');
-            } catch (err) {
-              console.error('❌ _worker.js 语法解析失败:', err.message);
-              process.exit(2);
-            }
-          "
+          node -e "const fs = require('fs'); try { const code = fs.readFileSync('_worker.js','utf8'); new Function(code); console.log('✅ _worker.js 语法解析通过'); } catch(err) { console.error('❌ _worker.js 语法解析失败:', err.message); process.exit(2); }"
 
-      - name: Optional: replace problematic const -> let (use with caution)
+      - name: Optional: replace problematic const -> let
         run: |
           if [ -f "_worker.js" ]; then
             sed -E -i.bak -e 's/\bconst\s+I\s*=\s*/let I = /g' _worker.js || true
             sed -E -i.bak -e 's/\bconst\s+h\s*=\s*/let h = /g' _worker.js || true
             sed -E -i.bak -e 's/\bconst\s+j\s*=\s*/let j = /g' _worker.js || true
-            echo '✅ 已应用保守 const→let 替换（生成 .bak 备份）'
+            echo '✅ 已应用保守 const->let 替换（生成 .bak 备份）'
           fi
 
       - name: Commit and push the obfuscated file
