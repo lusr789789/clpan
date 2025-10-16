@@ -57,7 +57,7 @@ function parseAddressAndPort(input) {
 }
 
 export default {
-	async fetch(request, env, ctx) {
+	async fetch(request, env) {
 		try {
 			const subPath = authToken.toLowerCase();
 
@@ -219,10 +219,10 @@ export default {
 									headers: { 'Content-Type': 'text/html; charset=utf-8' }
 								});
 							}
-						} catch (error) {
+						} catch (e) {
 							return new Response(JSON.stringify({
 								error: 'IP解析失败',
-								message: error.message
+								message: e.message
 							}), {
 								status: 500,
 								headers: { 'Content-Type': 'application/json' }
