@@ -53,7 +53,7 @@ function parseAddressAndPort(input) {
 }
 
 const worker = {
-	async fetch(请求, env) {
+	async fetch(request, env) {
 		const subPath = authToken.toLowerCase();
 
 		// 从环境变量获取配置(支持 P/p 参数)
@@ -66,7 +66,7 @@ const worker = {
 			}
 		}
 
-		const url = new 网站(请求.url);
+		const url = new URL(request.url);
 
 		// 检查 URL 路径中的 /proxyip= 参数,直接设置 ProxyIP
 		if (url.pathname.includes('/proxyip=')) {
