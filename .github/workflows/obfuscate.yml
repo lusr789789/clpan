@@ -44,28 +44,22 @@ jobs:
               process.exit(1);
             }
 
-            // --- 混淆配置（针对 Cloudflare Worker 的安全模式） ---
+            // --- 优化后的混淆配置 ---
             const obfuscationOptions = {
                 compact: true,
-                controlFlowFlattening: true,
-                controlFlowFlatteningThreshold: 0.75,
-                deadCodeInjection: true,
-                deadCodeInjectionThreshold: 0.4,
+                controlFlowFlattening: false,         // 禁用复杂控制流
+                deadCodeInjection: false,             // 禁用死代码
                 stringArray: true,
-                stringArrayEncoding: ['base64'],
+                stringArrayEncoding: ['rc4'],         // RC4 简单加密，兼容性更好
                 stringArrayThreshold: 0.75,
-                renameGlobals: false,                       // 重要：关闭全局重命名，避免跨作用域变量被改名导致 const 冲突
+                renameGlobals: false,                 
                 identifierNamesGenerator: 'mangled',
                 numbersToExpressions: true,
-                splitStrings: true,
-                splitStringsChunkLength: 10,
-                transformObjectKeys: true,
+                splitStrings: false,                   // 不拆分字符串，避免 Worker 过大
+                transformObjectKeys: false,            // 不混淆对象 key，保持接口兼容
                 selfDefending: false,
                 debugProtection: false,
-                // 保留常见短名，避免被混淆器替换成容易冲突的短名
-                reservedNames: ['^i$','^j$','^k$','^l$','^f$','^g$','^h$'],
-                // 兼容性/稳妥项（可按需删减）
-                // rotateStringArray: true
+                reservedNames: ['^i$','^j$','^k$','^l$','^f$','^g$','^h$']
             };
 
             const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
