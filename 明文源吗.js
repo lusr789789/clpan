@@ -578,8 +578,8 @@ export default {
 				}
 			}
 			return new Response('Not Found', { status: 404 });
-		} catch (err) {
-			return new Response(err.toString(), { status: 500 });
+		} catch (e) {
+			return new Response(e.toString(), { status: 500 });
 		}
 	},
 };
@@ -593,7 +593,7 @@ async function handleSubscriptionRequest(request, user, url = null) {
     try {
         const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
         finalLinks.push(...generateLinksFromSource(nativeList, user, workerDomain));
-    } catch (e) {
+    } catch (ex) {
         const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
         finalLinks.push(...generateLinksFromSource(nativeList, user, workerDomain));
     }
@@ -704,7 +704,7 @@ async function handleWsRequest(request) {
             if (isDnsQuery) return forwardUDP(rawData, serverSock, respHeader);
             await forwardTCP(hostname, port, rawData, serverSock, respHeader, remoteConnWrapper);
         },
-    })).catch((err) => { });
+    })).catch((ex) => { });
 
     return new Response(null, { status: 101, webSocket: clientSock });
 }
@@ -727,7 +727,7 @@ async function forwardTCP(host, portNum, rawData, ws, respHeader, remoteConnWrap
             remoteConnWrapper.socket = fallbackSocket;
             fallbackSocket.closed.catch(() => {}).finally(() => closeSocketQuietly(ws));
             connectStreams(fallbackSocket, ws, respHeader, null);
-        } catch (fallbackErr) {
+        } catch (fallbackEx) {
             closeSocketQuietly(ws);
         }
     }
@@ -736,7 +736,7 @@ async function forwardTCP(host, portNum, rawData, ws, respHeader, remoteConnWrap
         const initialSocket = await connectAndSend(host, portNum);
         remoteConnWrapper.socket = initialSocket;
         connectStreams(initialSocket, ws, respHeader, retryConnection);
-    } catch (err) {
+    } catch (ex) {
         retryConnection();
     }
 }
