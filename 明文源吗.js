@@ -58,23 +58,21 @@ function parseAddressAndPort(input) {
 
 export default {
 	async fetch(request, env) {
-		try {
-			const subPath = authToken.toLowerCase();
+		const subPath = authToken.toLowerCase();
 
-						
-			// 只使用动态设置的值
-			if (dynamicFallbackAddress) {
-				fallbackAddress = dynamicFallbackAddress;
-				fallbackPort = dynamicFallbackPort;
-			}
 
-			
-			
-			
-			
-			const url = new URL(request.url);
+		// 只使用动态设置的值
+		if (dynamicFallbackAddress) {
+			fallbackAddress = dynamicFallbackAddress;
+			fallbackPort = dynamicFallbackPort;
+		}
 
-			if (request.headers.get('Upgrade') === 'websocket') {
+
+
+
+		const url = new URL(request.url);
+
+		if (request.headers.get('Upgrade') === 'websocket') {
 				return await handleWsRequest(request);
 			} else if (request.method === 'GET') {
 				if (url.pathname === '/region') {
@@ -577,10 +575,7 @@ export default {
 					return await handleSubscriptionRequest(request, authToken);
 				}
 			}
-			return new Response('Not Found', { status: 404 });
-		} catch (e) {
-			return new Response(e.toString(), { status: 500 });
-		}
+		return new Response('Not Found', { status: 404 });
 	},
 };
 
@@ -590,13 +585,8 @@ async function handleSubscriptionRequest(request, user, url = null) {
     const finalLinks = [];
     const workerDomain = url.hostname;
 
-    try {
-        const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
-        finalLinks.push(...generateLinksFromSource(nativeList, user, workerDomain));
-    } catch (ex) {
-        const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
-        finalLinks.push(...generateLinksFromSource(nativeList, user, workerDomain));
-    }
+    const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
+    finalLinks.push(...generateLinksFromSource(nativeList, user, workerDomain));
 
     
     
@@ -722,23 +712,15 @@ async function forwardTCP(host, portNum, rawData, ws, respHeader, remoteConnWrap
         const backupHost = fallbackAddress || host;
         const backupPort = parseInt(fallbackPort, 10) || portNum;
 
-        try {
-            const fallbackSocket = await connectAndSend(backupHost, backupPort);
-            remoteConnWrapper.socket = fallbackSocket;
-            fallbackSocket.closed.catch(() => {}).finally(() => closeSocketQuietly(ws));
-            connectStreams(fallbackSocket, ws, respHeader, null);
-        } catch (fallbackEx) {
-            closeSocketQuietly(ws);
-        }
+        const fallbackSocket = await connectAndSend(backupHost, backupPort);
+        remoteConnWrapper.socket = fallbackSocket;
+        fallbackSocket.closed.catch(() => {}).finally(() => closeSocketQuietly(ws));
+        connectStreams(fallbackSocket, ws, respHeader, null);
     }
 
-    try {
-        const initialSocket = await connectAndSend(host, portNum);
-        remoteConnWrapper.socket = initialSocket;
-        connectStreams(initialSocket, ws, respHeader, retryConnection);
-    } catch (ex) {
-        retryConnection();
-    }
+    const initialSocket = await connectAndSend(host, portNum);
+    remoteConnWrapper.socket = initialSocket;
+    connectStreams(initialSocket, ws, respHeader, retryConnection);
 }
 
 function parseWsPacketHeader(chunk, token) {
@@ -794,21 +776,19 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc) {
 }
 
 async function forwardUDP(udpChunk, webSocket, respHeader) {
-	try {
-		const tcpSocket = connect({ hostname: '8.8.4.4', port: 53 });
-		let header = respHeader;
-		const writer = tcpSocket.writable.getWriter();
-		await writer.write(udpChunk);
-		writer.releaseLock();
-		await tcpSocket.readable.pipeTo(new WritableStream({
-			async write(chunk) {
-				if (webSocket.readyState === 1) {
-					if (header) { webSocket.send(await new Blob([header, chunk]).arrayBuffer()); header = null; } 
-                    else { webSocket.send(chunk); }
-				}
-			},
-		}));
-	} catch (e) { console.error(`DNS forward error: ${e.message}`); }
+	const tcpSocket = connect({ hostname: '8.8.4.4', port: 53 });
+	let header = respHeader;
+	const writer = tcpSocket.writable.getWriter();
+	await writer.write(udpChunk);
+	writer.releaseLock();
+	await tcpSocket.readable.pipeTo(new WritableStream({
+		async write(chunk) {
+			if (webSocket.readyState === 1) {
+				if (header) { webSocket.send(await new Blob([header, chunk]).arrayBuffer()); header = null; }
+                else { webSocket.send(chunk); }
+			}
+		},
+	}));
 }
 
 
@@ -1203,11 +1183,10 @@ async function handleSubscriptionPage(request, user = null) {
 
 function base64ToArray(b64Str) {
 	if (!b64Str) return { error: null };
-	try { b64Str = b64Str.replace(/-/g, '+').replace(/_/g, '/'); return { earlyData: Uint8Array.from(atob(b64Str), (c) => c.charCodeAt(0)).buffer, error: null }; } 
-    catch (e) { return { error: e }; }
+	b64Str = b64Str.replace(/-/g, '+').replace(/_/g, '/'); return { earlyData: Uint8Array.from(atob(b64Str), (c) => c.charCodeAt(0)).buffer, error: null };
 }
 
-function closeSocketQuietly(socket) { try { if (socket.readyState === 1 || socket.readyState === 2) socket.close(); } catch (e) {} }
+function closeSocketQuietly(socket) { if (socket.readyState === 1 || socket.readyState === 2) socket.close(); }
 
 const hexTable = Array.from({ length: 256 }, (v, i) => (i + 256).toString(16).slice(1));
 function formatIdentifier(arr, offset = 0) {
