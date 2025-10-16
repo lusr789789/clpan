@@ -50,7 +50,7 @@ jobs:
                 controlFlowFlattening: false,         // 禁用复杂控制流
                 deadCodeInjection: false,             // 禁用死代码
                 stringArray: true,
-                stringArrayEncoding: ['rc4'],         // RC4 简单加密，兼容性更好
+                stringArrayEncoding: ['base64'],         // RC4 简单加密，兼容性更好
                 stringArrayThreshold: 0.75,
                 renameGlobals: false,                 
                 identifierNamesGenerator: 'mangled',
