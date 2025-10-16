@@ -18,21 +18,22 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Node.js utilities
-        run: echo "Using built-in Node.js utilities"
+      - name: Install Obfuscator
+        run: npm install javascript-obfuscator
 
       - name: Obfuscate from local source file
         run: |
           node -e "
+            const JavaScriptObfuscator = require('javascript-obfuscator');
             const fs = require('fs');
             const path = require('path');
             
-            const sourceFileName = '明文源吗.js';
-            const outputFileName = '_worker.js';
+            const sourceFileName = '明文源吗';
+            const outputFileName = '少年你相信光吗';
             const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
             if (!fs.existsSync(sourceFilePath)) {
-              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保您的仓库根目录有名为 \'明文源吗.js\' 的文件。');
+              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保您的仓库根目录有名为 \'明文源吗\' 的文件。');
               process.exit(1);
             }
 
@@ -43,39 +44,106 @@ jobs:
               process.exit(1);
             }
 
-            // --- 仅压缩代码，不混淆 ---
-            console.log('开始压缩代码...');
-            console.log('源文件大小:', originalCode.length, '字符');
+            // --- 最终平衡型混淆配置 ---
+            const obfuscationOptions = {
+                compact: true,
+                controlFlowFlattening: true,
+                controlFlowFlatteningThreshold: 0.75,
+                deadCodeInjection: true,
+                deadCodeInjectionThreshold: 0.4,
+                stringArray: true,
+                stringArrayEncoding: ['base64'],
+                stringArrayThreshold: 0.75,
+                renameGlobals: true,
+                identifierNamesGenerator: 'mangled',
+                numbersToExpressions: true,
+                splitStrings: true,
+                splitStringsChunkLength: 10,
+                transformObjectKeys: true,
+                selfDefending: false,
+                debugProtection: false
+            };
 
-            try {
-                // 简单的代码压缩：移除注释、多余空白，但保持代码结构不变
-                let compressedCode = originalCode
-                    // 移除单行注释（保留URL中的//）
-                    .replace(/(?:^|\n|\r)\s*\/\/.*$/gm, '')
-                    // 移除多行注释
-                    .replace(/\/\*[\s\S]*?\*\//g, '')
-                    // 移除多余的空行和空白
-                    .replace(/\n\s*\n/g, '\n')
-                    .replace(/^\s+|\s+$/gm, '')
-                    // 压缩空白字符，但保留必要的空格
-                    .replace(/([{}();,])\s+/g, '$1')
-                    .replace(/\s+([{}();,])/g, '$1')
-                    .replace(/\s+/g, ' ');
+            const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
+            
+            fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
+            console.log('成功将 \'' + sourceFileName + '\' 混淆并保存至 \'' + outputFileName + '\'。');
+          "
 
-                console.log('压缩成功，输出大小:', compressedCode.length, '字符');
+      - name: Commit and push the obfuscated file
+        run: |
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add 'name: Generate and Obfuscate Worker Script
 
-                // 写入压缩后的代码
-                fs.writeFileSync(path.join(process.cwd(), outputFileName), compressedCode, 'utf8');
-                console.log('成功将 \'' + sourceFileName + '\' 压缩并保存至 \'' + outputFileName + '\'。');
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
 
-            } catch (compressionError) {
-                console.error('压缩失败:', compressionError.message);
-                console.log('直接复制原始代码...');
+jobs:
+  build-and-obfuscate:
+    runs-on: ubuntu-latest
 
-                // 如果压缩失败，直接复制原始代码
-                fs.writeFileSync(path.join(process.cwd(), outputFileName), originalCode, 'utf8');
-                console.log('直接复制 \'' + sourceFileName + '\' 到 \'' + outputFileName + '\'。');
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Obfuscator
+        run: npm install javascript-obfuscator
+
+      - name: Obfuscate from local source file
+        run: |
+          node -e "
+            const JavaScriptObfuscator = require('javascript-obfuscator');
+            const fs = require('fs');
+            const path = require('path');
+            
+            const sourceFileName = '明文源吗.js';
+            const outputFileName = '_worker.js';
+            const sourceFilePath = path.join(process.cwd(), sourceFileName);
+
+            if (!fs.existsSync(sourceFilePath)) {
+              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保您的仓库根目录有名为 \'明文源吗\' 的文件。');
+              process.exit(1);
             }
+
+            const originalCode = fs.readFileSync(sourceFilePath, 'utf8');
+
+            if (!originalCode || originalCode.trim().length === 0) {
+              console.error('错误：源文件 ' + sourceFileName + ' 为空。');
+              process.exit(1);
+            }
+
+            // --- 最终平衡型混淆配置 ---
+            const obfuscationOptions = {
+                compact: true,
+                controlFlowFlattening: true,
+                controlFlowFlatteningThreshold: 0.75,
+                deadCodeInjection: true,
+                deadCodeInjectionThreshold: 0.4,
+                stringArray: true,
+                stringArrayEncoding: ['base64'],
+                stringArrayThreshold: 0.75,
+                renameGlobals: true,
+                identifierNamesGenerator: 'mangled',
+                numbersToExpressions: true,
+                splitStrings: true,
+                splitStringsChunkLength: 10,
+                transformObjectKeys: true,
+                selfDefending: false,
+                debugProtection: false
+            };
+
+            const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
+            
+            fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
+            console.log('成功将 \'' + sourceFileName + '\' 混淆并保存至 \'' + outputFileName + '\'。');
           "
 
       - name: Commit and push the obfuscated file
@@ -83,6 +151,12 @@ jobs:
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add '_worker.js'
+          if git diff --staged --quiet; then
+            echo "No changes to commit, the obfuscated file is already up-to-date."
+          else
+            git commit -m "build: Generate and obfuscate worker script"
+            git push
+          fi'
           if git diff --staged --quiet; then
             echo "No changes to commit, the obfuscated file is already up-to-date."
           else
