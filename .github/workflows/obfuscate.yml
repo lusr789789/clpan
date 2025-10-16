@@ -44,9 +44,9 @@ jobs:
               process.exit(1);
             }
 
-            // --- 兼容性优先混淆配置 ---
+            // --- 最安全混淆配置 ---
             const obfuscationOptions = {
-                compact: true,
+                compact: false,
                 controlFlowFlattening: false,
                 deadCodeInjection: false,
                 stringArray: false,
@@ -55,14 +55,36 @@ jobs:
                 rotateStringArray: false,
                 shuffleStringArray: false,
                 unicodeEscapeSequence: false,
-                simplify: true,
+                simplify: false,
                 target: 'browser'
             };
 
-            const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
-            
-            fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
-            console.log('成功将 \'' + sourceFileName + '\' 混淆并保存至 \'' + outputFileName + '\'。');
+            console.log('开始混淆代码...');
+          console.log('源文件大小:', originalCode.length, '字符');
+
+          try {
+              const obfuscationResult = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions);
+              const obfuscatedCode = obfuscationResult.getObfuscatedCode();
+              console.log('混淆成功，输出大小:', obfuscatedCode.length, '字符');
+
+              fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
+              console.log('成功将 \'' + sourceFileName + '\' 混淆并保存至 \'' + outputFileName + '\'。');
+          } catch (obfuscationError) {
+              console.error('混淆失败:', obfuscationError.message);
+              console.error('错误详情:', obfuscationError.stack);
+              console.log('尝试使用最小混淆配置...');
+
+              const minimalOptions = {
+                  compact: false,
+                  identifierNamesGenerator: 'hexadecimal'
+              };
+
+              const fallbackResult = JavaScriptObfuscator.obfuscate(originalCode, minimalOptions);
+              const fallbackCode = fallbackResult.getObfuscatedCode();
+
+              fs.writeFileSync(path.join(process.cwd(), outputFileName), fallbackCode, 'utf8');
+              console.log('使用最小配置成功将 \'' + sourceFileName + '\' 混淆并保存至 \'' + outputFileName + '\'。');
+          }
           "
 
       - name: Commit and push the obfuscated file
