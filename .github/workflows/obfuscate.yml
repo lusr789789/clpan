@@ -2,7 +2,7 @@ name: Generate and Obfuscate Worker Script
 
 on:
   workflow_dispatch:   # 手动触发
-  schedule:
+chedule:
     - cron: '0 * * * *'  # 每小时自动触发
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
       - name: Install Obfuscator
         run: npm install javascript-obfuscator
 
-      # 4. 混淆 cfproxy.js 文件
+      # 4. 混淆 ssproxy.js 文件
       - name: Obfuscate from local source file
         run: |
           node -e "
@@ -34,7 +34,7 @@ jobs:
             const fs = require('fs');
             const path = require('path');
 
-            const sourceFileName = 'cfproxy.js';
+            const sourceFileName = 'ssproxy.js';
             const outputFileName = '_worker.js';
             const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
