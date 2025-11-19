@@ -1,74 +1,77 @@
 name: Generate and Obfuscate Worker Script
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # 手动触发
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 * * * *'  # 每小时自动触发
 
 jobs:
   build-and-obfuscate:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout SS 分支
       - name: Checkout repository (SS branch)
         uses: actions/checkout@v4
         with:
-          ref: SS
+          ref:ss# ⚠️ 确保分支名与 GitHub 上一致（大小写敏感）
 
+      # 2. 设置 Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
+      # 3. 安装 javascript-obfuscator
       - name: Install Obfuscator
         run: npm install javascript-obfuscator
 
+      # 4. 混淆 cfproxy.js 文件
       - name: Obfuscate from local source file
         run: |
           node -e "
             const JavaScriptObfuscator = require('javascript-obfuscator');
             const fs = require('fs');
             const path = require('path');
-            
+
             const sourceFileName = 'cfproxy.js';
             const outputFileName = '_worker.js';
             const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
             if (!fs.existsSync(sourceFilePath)) {
-              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保仓库 SS 分支根目录有名为 \'' + sourceFileName + '\' 的文件。');
+              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件，请确保 SS 分支根目录存在 ' + sourceFileName);
               process.exit(1);
             }
 
             const originalCode = fs.readFileSync(sourceFilePath, 'utf8');
-
             if (!originalCode || originalCode.trim().length === 0) {
               console.error('错误：源文件 ' + sourceFileName + ' 为空。');
               process.exit(1);
             }
 
             const obfuscationOptions = {
-                compact: true,
-                controlFlowFlattening: false,
-                deadCodeInjection: false,
-                stringArray: true,
-                stringArrayEncoding: ['base64'],
-                stringArrayThreshold: 0.75,
-                renameGlobals: false,
-                identifierNamesGenerator: 'mangled',
-                numbersToExpressions: true,
-                splitStrings: false,
-                transformObjectKeys: false,
-                selfDefending: false,
-                debugProtection: false,
-                reservedNames: ['^i$','^j$','^k$','^l$','^f$','^g$','^h$']
+              compact: true,
+              controlFlowFlattening: false,
+              deadCodeInjection: false,
+              stringArray: true,
+              stringArrayEncoding: ['base64'],
+              stringArrayThreshold: 0.75,
+              renameGlobals: false,
+              identifierNamesGenerator: 'mangled',
+              numbersToExpressions: true,
+              splitStrings: false,
+              transformObjectKeys: false,
+              selfDefending: false,
+              debugProtection: false,
+              reservedNames: ['^i$','^j$','^k$','^l$','^f$','^g$','^h$']
             };
 
             const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
-            
             fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
-            console.log('成功混淆并保存至 \'' + outputFileName + '\'。');
+            console.log('成功将 ' + sourceFileName + ' 混淆并保存至 ' + outputFileName);
           "
 
+      # 5. 提交并推送 _worker.js 到 SS 分支
       - name: Commit and push the obfuscated file to SS
         run: |
           git config --global user.name 'GitHub Actions Bot'
@@ -79,4 +82,3 @@ jobs:
           else
             git commit -m "build: Generate and obfuscate worker script"
             git push origin SS
-          fi
