@@ -33,7 +33,7 @@ function parsePryAddress(serverStr) {
     if (serverStr.startsWith('socks://') || serverStr.startsWith('socks5://')) {
         const urlStr = serverStr.replace(/^socks:\/\//, 'socks5://');
         try {
-            const url = new 网站(urlStr);
+            const url = new URL(urlStr);
             return {
                 type: 'socks5',
                 host: url.hostname,
@@ -48,7 +48,7 @@ function parsePryAddress(serverStr) {
     
     if (serverStr.startsWith('http://') || serverStr.startsWith('https://')) {
         try {
-            const url = new 网站(serverStr);
+            const url = new URL(serverStr);
             return {
                 type: 'http',
                 host: url.hostname,
@@ -92,17 +92,17 @@ function parsePryAddress(serverStr) {
 }
 
 export default {
-    async fetch(请求,env) {
+    async fetch(request,env) {
         try {
             if (SSpath === '') {
                 SSpath = password;
             }
 
             let validPath = `/${SSpath}`; 
-            const servers = proxyIP.split(',').map( => .trim());
+            const servers = proxyIP.split(',').map(s => s.trim());
             proxyIP = servers[0];
 
-            const url = new 网站(请求.url);
+            const url = new URL(request.url);
             const pathname = url.pathname;
         
             let pathProxyIP = null;
@@ -114,7 +114,7 @@ export default {
                     // 忽略错误
                 }
 
-                if (pathProxyIP && !请求.headers.get('Upgrade')) {
+                if (pathProxyIP && !request.headers.get('Upgrade')) {
                     proxyIP = pathProxyIP;
                     return new Response(`set proxyIP to: ${proxyIP}\n\n`, {
                         headers: { 
@@ -125,7 +125,7 @@ export default {
                 }
             }
 
-            if (请求.headers.get('Upgrade') === 'websocket') {
+            if (request.headers.get('Upgrade') === 'websocket') {
                 if (!pathname.startsWith(paramPrefix)) {
                     return new Response('Unauthorized', { status: 401 });
                 }
@@ -135,8 +135,8 @@ export default {
                 } catch (e) {
                     // 忽略错误
                 }
-                const customProxyIP = wsPathProxyIP || url.searchParams.get(paramName) || 请求.headers.get(paramName);
-                return await handleSSRequest(请求, customProxyIP);
+                const customProxyIP = wsPathProxyIP || url.searchParams.get(paramName) || request.headers.get(paramName);
+                return await handleSSRequest(request, customProxyIP);
             }
             return new Response('Not Found', { status: 404 });
         } catch (err) {
@@ -145,13 +145,13 @@ export default {
     },
 };
 
-async function handleSSRequest(请求, customProxyIP) {
+async function handleSSRequest(request, customProxyIP) {
     const wssPair = new WebSocketPair();
     const [clientSock, serverSock] = Object.values(wssPair);
     serverSock.accept();
     let remoteConnWrapper = { socket: null };
     let isDnsQuery = false;
-    const earlyData = 请求.headers.get('sec-websocket-protocol') || '';
+    const earlyData = request.headers.get('sec-websocket-protocol') || '';
     const readable = makeReadableStr(serverSock, earlyData);
 
     readable.pipeTo(new WritableStream({
