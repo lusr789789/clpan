@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (SS branch)
         uses: actions/checkout@v4
+        with:
+          ref: SS
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -33,7 +35,7 @@ jobs:
             const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
             if (!fs.existsSync(sourceFilePath)) {
-              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保您的仓库根目录有名为 \'' + sourceFileName + '\' 的文件。');
+              console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保仓库 SS 分支根目录有名为 \'' + sourceFileName + '\' 的文件。');
               process.exit(1);
             }
 
@@ -44,19 +46,18 @@ jobs:
               process.exit(1);
             }
 
-            // --- 优化后的混淆配置 ---
             const obfuscationOptions = {
                 compact: true,
-                controlFlowFlattening: false,         // 禁用复杂控制流
-                deadCodeInjection: false,             // 禁用死代码
+                controlFlowFlattening: false,
+                deadCodeInjection: false,
                 stringArray: true,
-                stringArrayEncoding: ['base64'],         // RC4 简单加密，兼容性更好
+                stringArrayEncoding: ['base64'],
                 stringArrayThreshold: 0.75,
-                renameGlobals: false,                 
+                renameGlobals: false,
                 identifierNamesGenerator: 'mangled',
                 numbersToExpressions: true,
-                splitStrings: false,                   // 不拆分字符串，避免 Worker 过大
-                transformObjectKeys: false,            // 不混淆对象 key，保持接口兼容
+                splitStrings: false,
+                transformObjectKeys: false,
                 selfDefending: false,
                 debugProtection: false,
                 reservedNames: ['^i$','^j$','^k$','^l$','^f$','^g$','^h$']
@@ -65,10 +66,10 @@ jobs:
             const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
             
             fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
-            console.log('成功将 \'' + sourceFileName + '\' 混淆并保存至 \'' + outputFileName + '\'。');
+            console.log('成功混淆并保存至 \'' + outputFileName + '\'。');
           "
 
-      - name: Commit and push the obfuscated file
+      - name: Commit and push the obfuscated file to SS
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
@@ -77,5 +78,5 @@ jobs:
             echo "No changes to commit, the obfuscated file is already up-to-date."
           else
             git commit -m "build: Generate and obfuscate worker script"
-            git push
+            git push origin SS
           fi
