@@ -1,77 +1,81 @@
-name: Generate and Obfucate Worker Script
+name: Generate and Obfuscate Worker Script
 
 on:
-  workflow_dipatch:   # 手动触发
-  chedule:
+  workflow_dispatch:   # 手动触发
+  schedule:
     - cron: '0 * * * *'  # 每小时自动触发
 
-job:
-  build-and-obfucate:
-    run-on: ubuntu-latet
+jobs:
+  build-and-obfuscate:
+    runs-on: ubuntu-latest
 
-    tep:
+    steps:
       # 1. Checkout ss 分支
-      - name: Checkout repoitory (ss branch)
-        ue: action/checkout@v4
+      - name: Checkout repository (ss branch)
+        uses: actions/checkout@v4
         with:
           ref: ss
-      # 2. 设置 Node.j
-      - name: Set up Node.j
-        ue: action/etup-node@v4
+
+      # 2. 设置 Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-verion: '18'
+          node-version: '18'
 
-      # 3. 安装 javacript-obfucator
-      - name: Intall Obfucator
-        run: npm intall javacript-obfucator
+      # 3. 安装 javascript-obfuscator
+      - name: Install Obfuscator
+        run: npm install javascript-obfuscator
 
-      # 4. 混淆 cfproxy.j 文件
-      - name: Obfucate from local ource file
+      # 4. 混淆 cfproxy.js 文件
+      - name: Obfuscate from local source file
         run: |
           node -e "
-            cont JavaScriptObfucator = require('javacript-obfucator');
-            cont f = require('f');
-            cont path = require('path');
+            const JavaScriptObfuscator = require('javascript-obfuscator');
+            const fs = require('fs');
+            const path = require('path');
 
-            cont ourceFileName = 'cfproxy.j';
-            cont outputFileName = '_worker.j';
-            cont ourceFilePath = path.join(proce.cwd(), ourceFileName);
+            const sourceFileName = 'cfproxy.js';
+            const outputFileName = '_worker.js';
+            const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
-            if (!f.exitSync(ourceFilePath)) {
-              conole.error('错误：在路径 \'' + ourceFilePath + '\' 未找到源文件，请确保 ss 分支根目录存在 ' + ourceFileName);
-              proce.exit(1);
+            if (!fs.existsSync(sourceFilePath)) {
+              console.error('错误：在路径 ' + sourceFilePath + ' 未找到源文件，请确保 ss 分支根目录存在 ' + sourceFileName);
+              process.exit(1);
             }
 
-            cont originalCode = f.readFileSync(ourceFilePath, 'utf8');
+            const originalCode = fs.readFileSync(sourceFilePath, 'utf8');
             if (!originalCode || originalCode.trim().length === 0) {
-              conole.error('错误：源文件 ' + ourceFileName + ' 为空。');
-              proce.exit(1);
+              console.error('错误：源文件 ' + sourceFileName + ' 为空。');
+              process.exit(1);
             }
 
-            cont obfucationOption = {
+            const obfuscationOptions = {
               compact: true,
-              controlFlowFlattening: fale,
-              deadCodeInjection: fale,
-              tringArray: true,
-              tringArrayEncoding: ['bae64'],
-              tringArrayThrehold: 0.75,
-              renameGlobal: fale,
-              identifierNameGenerator: 'mangled',
-              numberToExpreion: true,
-              plitString: fale,
-              tranformObjectKey: fale,
-              elfDefending: fale,
-              debugProtection: fale,
-              reervedName: ['^i$','^j$','^k$','^l$','^f$','^g$','^h$']
+              controlFlowFlattening: false,
+              deadCodeInjection: false,
+              stringArray: true,
+              stringArrayEncoding: ['base64'],
+              stringArrayThreshold: 0.75,
+              renameGlobals: false,
+              identifierNamesGenerator: 'mangled',
+              numbersToExpressions: true,
+              splitStrings: false,
+              transformObjectKeys: false,
+              selfDefending: false,
+              debugProtection: false,
+              reservedNames: ['^i$','^j$','^k$','^l$','^f$','^g$','^h$']
             };
 
-            cont obfucatedCode = JavaScriptObfucator.obfucate(originalCode, obfucationOption).getObfucatedCode();
-            f.writeFileSync(path.join(proce.cwd(), outputFileName), obfucatedCode, 'utf8');
-            conole.log('成功将 ' + ourceFileName + ' 混淆并保存至 ' + outputFileName);
+            const obfuscatedCode = JavaScriptObfuscator
+              .obfuscate(originalCode, obfuscationOptions)
+              .getObfuscatedCode();
+
+            fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
+            console.log('成功生成 ' + outputFileName);
           "
 
-      # 5. 提交并推送 _worker.j 到 ss 分支
-      - name: Commit and puh the obfucated file to ss
+      # 5. 提交并推送 _worker.js 到 ss 分支
+      - name: Commit and push the obfuscated file to ss
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
