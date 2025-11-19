@@ -2,7 +2,7 @@ name: Generate and Obfuscate Worker Script
 
 on:
   workflow_dispatch:   # 手动触发
-chedule:
+  schedule:
     - cron: '0 * * * *'  # 每小时自动触发
 
 jobs:
@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout ss 分支
-      - name: Checkout repository (ss branch)
+      # 1. Checkout 当前触发的分支（自动识别大小写）
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
@@ -33,13 +33,12 @@ jobs:
             const JavaScriptObfuscator = require('javascript-obfuscator');
             const fs = require('fs');
             const path = require('path');
-
             const sourceFileName = 'ssproxy.js';
             const outputFileName = '_worker.js';
             const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
             if (!fs.existsSync(sourceFilePath)) {
-              console.error('错误：在路径 ' + sourceFilePath + ' 未找到源文件，请确保 ss 分支根目录存在 ' + sourceFileName);
+              console.error('错误：在路径 ' + sourceFilePath + ' 未找到源文件，请确保分支根目录存在 ' + sourceFileName);
               process.exit(1);
             }
 
@@ -74,8 +73,8 @@ jobs:
             console.log('成功生成 ' + outputFileName);
           "
 
-      # 5. 提交并推送 _worker.js 到 ss 分支
-      - name: Commit and push the obfuscated file to ss
+      # 5. 提交并推送 _worker.js 到当前分支
+      - name: Commit and push the obfuscated file
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
@@ -84,4 +83,4 @@ jobs:
             echo "No changes to commit, the obfuscated file is already up-to-date."
           else
             git commit -m "build: Generate and obfuscate worker script"
-            git push origin ss
+            git push origin ${{ github.ref_name }}
